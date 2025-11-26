@@ -16,6 +16,7 @@
 ## Pre-commit and CI
 - Install hooks: `pre-commit install`. Run `pre-commit run -a` before pushing.
 - CI: `.github/workflows/ci.yml` runs pre-commit, quality gates (`ci/run_quality_gates.sh`). Keep npm/pytest/mypy scripts current.
+- Keep CODE_MAP.md updated after structural changes (backend/frontend/training scaffolds).
 
 ## Documentation Expectations
 - Update docstrings/public API docs for non-trivial modules.
