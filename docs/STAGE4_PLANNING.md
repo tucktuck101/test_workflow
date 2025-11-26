@@ -6,3 +6,4 @@
 - CI/Branch protection: confirm required checks from `.github/workflows/ci.yml` and branch protection are enabled before implementation begins.
 - Dependencies/tests: map expected CI/test suites to Quality Gate (medium risk, standard tier) and ensure coverage gates match docs.
 - Observability/security hooks: ensure Issue/PR templates reflect Critic Pass, ADR checks, and observability expectations for upcoming tasks.
+- Backlog tracking: use `docs/BACKLOG.md` for Epics/Features/Tasks and keep `docs/EPIC_LOG.md` updated at epic start/finish.
