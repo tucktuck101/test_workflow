@@ -1,39 +1,39 @@
- # PROJECT_POLICY.yaml
- # Bootstrap skeleton only. All fields marked TO_BE_SET_BY_CODEX
- # must be filled during Codex Interview Mode.
- project_name: Coding_Agent_worklfow
- contract_version: v1.4
+# PROJECT_POLICY.yaml
+# Bootstrap skeleton only. All fields marked TO_BE_SET_BY_CODEX
+# must be filled during Codex Interview Mode.
+project_name: Coding_Agent_worklfow
+contract_version: v1.4
 
- supervision_mode: async
- supervisor_response_window_hours: 168
+supervision_mode: async
+supervisor_response_window_hours: 168
 
- workflow_profile: standard
- tier: standard
- repo_strategy: monorepo
- security_profile: baseline
+workflow_profile: standard
+tier: standard
+repo_strategy: monorepo
+security_profile: baseline
 
- cost_guardrails:
-   allow_cloud_resources: false
-   allow_paid_saas: false
-   notes: Local-only development; revisit cloud resources and paid SaaS after the MVP is deployment-ready.
+cost_guardrails:
+  allow_cloud_resources: false
+  allow_paid_saas: false
+  notes: Local-only development; revisit cloud resources and paid SaaS after the MVP is deployment-ready.
 
- tech_stack_constraints:
-   allowed_languages:
-     - TypeScript
-     - Python
-   disallowed_languages: []
-   frontend_allowed: true
-   infra_targets:
-     - local
-     - kubernetes
+tech_stack_constraints:
+  allowed_languages:
+    - TypeScript
+    - Python
+  disallowed_languages: []
+  frontend_allowed: true
+  infra_targets:
+    - local
+    - kubernetes
 
- environments:
-   - dev
-   - test
-   - prod
-   - training
- max_environments: 4
+environments:
+  - dev
+  - test
+  - prod
+  - training
+max_environments: 4
 
- domain_toggles:
-   external_db_allowed: true
-   auth_complex_allowed: false
+domain_toggles:
+  external_db_allowed: true
+  auth_complex_allowed: false
