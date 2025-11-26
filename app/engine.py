@@ -1,5 +1,6 @@
 import enum
 import random
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -171,26 +172,36 @@ def quit_game(session: GameSession) -> None:
 
 
 class InMemorySessionStore:
-    """Soft-cap in-memory session store (no TTL yet)."""
+    """Soft-cap in-memory session store with TTL support."""
 
-    def __init__(self, max_active_games: Optional[int] = None) -> None:
+    def __init__(self, max_active_games: Optional[int] = None, ttl_seconds: Optional[int] = None) -> None:
         self._sessions: Dict[str, GameSession] = {}
         self._ended_ids: set[str] = set()
         self._max = max_active_games
+        self._ttl = ttl_seconds
+        self._created_at: Dict[str, float] = {}
 
     def create(self, board_size: int, deterministic_seed: Optional[int] = None) -> GameSession:
         if self._max is not None and len(self._sessions) >= self._max:
             raise InvalidMove("capacity_exceeded")
         session = create_session(board_size, deterministic_seed)
         self._sessions[session.game_id] = session
+        self._created_at[session.game_id] = time.time()
         return session
 
     def get(self, game_id: str) -> Optional[GameSession]:
-        return self._sessions.get(game_id)
+        session = self._sessions.get(game_id)
+        if session and self._ttl is not None:
+            created = self._created_at.get(game_id, 0)
+            if time.time() - created > self._ttl:
+                self.end(game_id)
+                return None
+        return session
 
     def end(self, game_id: str) -> None:
         self._sessions.pop(game_id, None)
         self._ended_ids.add(game_id)
+        self._created_at.pop(game_id, None)
 
     @property
     def active_count(self) -> int:
