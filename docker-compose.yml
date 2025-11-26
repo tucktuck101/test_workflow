@@ -1,0 +1,28 @@
+version: "3.9"
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      - MODEL_PATH=/app/model.bin
+      - MODEL_VERSION=v0.0.1
+      - MODEL_HASH=stub
+      - MODEL_DEVICE=cpu
+      - BOARD_SIZE=10
+      - LOG_LEVEL=info
+      - OBSERVABILITY_ENABLED=true
+      - DETERMINISTIC_MODE=true
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:80"
