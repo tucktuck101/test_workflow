@@ -1,0 +1,17 @@
+name: Project Intake - Issues
+
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add issue to Delivery Board
+        uses: actions/add-to-project@v1
+        with:
+          project-url: https://github.com/users/tucktuck101/projects/6
+          github-token: ${{ secrets.PROJECT_PAT }}
+          field-keys: |
+            Board Column=Backlog
