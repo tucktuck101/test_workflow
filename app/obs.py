@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Callable, Dict, Optional
+from typing import Dict, Iterator, Optional
 
 from opentelemetry import metrics, trace
 from opentelemetry.sdk.metrics import MeterProvider
@@ -35,12 +35,12 @@ class Observability:
         )
 
     @contextmanager
-    def span(self, name: str, attributes: Optional[Dict] = None):
+    def span(self, name: str, attributes: Optional[Dict] = None) -> Iterator[None]:
         span = self.tracer.start_span(name=name)
         if attributes:
             for k, v in attributes.items():
                 span.set_attribute(k, v)
         try:
-            yield span
+            yield
         finally:
             span.end()

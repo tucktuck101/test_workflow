@@ -17,6 +17,6 @@ def test_agent_non_deterministic_varies():
     agent_non = AgentAdapter(deterministic=False)
     move1 = agent_non.next_move(session)
     # mark that move as taken to force different outcome next call
-    session.player_board_hits[move1] = None  # type: ignore
+    session.player_board_hits[move1] = session.player_board_hits.get(move1, None) or None
     move2 = agent_non.next_move(session)
     assert move1 != move2
