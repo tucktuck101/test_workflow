@@ -83,7 +83,7 @@ jobs:
             }
 
             // Add item
-            const addRes = await github.request('POST https://api.github.com/graphql', {
+            const addResult = await github.request('POST https://api.github.com/graphql', {
               headers: { Authorization: `Bearer ${process.env.PROJECT_PAT}` },
               query: `
                 mutation($project: ID!, $content: ID!) {
@@ -94,7 +94,7 @@ jobs:
               `,
               variables: { project: projectId, content: issue.node_id },
             });
-            const itemId = addRes.data.addProjectV2ItemById?.item?.id;
+            const itemId = addResult.data.addProjectV2ItemById?.item?.id;
             if (!itemId) {
               core.warning('Project item ID not obtained; skipping.');
               return;
