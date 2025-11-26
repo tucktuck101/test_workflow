@@ -1,3 +1,128 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- helpers ---------------------------------------------------------------
+
+ask() {
+  local prompt default var
+  prompt="$1"
+  default="$2"
+  read -r -p "$prompt [$default]: " var || true
+  if [ -z "$var" ]; then
+    echo "$default"
+  else
+    echo "$var"
+  fi
+}
+
+ask_yn() {
+  local prompt default var
+  prompt="$1"
+  default="$2"  # y or n
+  local default_label
+  if [ "$default" = "y" ]; then
+    default_label="Y/n"
+  else
+    default_label="y/N"
+  fi
+  while true; do
+    read -r -p "$prompt [$default_label]: " var || true
+    if [ -z "$var" ]; then
+      var="$default"
+    fi
+    case "$var" in
+      y|Y) echo "true"; return 0 ;;
+      n|N) echo "false"; return 0 ;;
+      *) echo "Please answer y or n." ;;
+    esac
+  done
+}
+
+trim() {
+  echo "$1" | xargs
+}
+
+echo "=== Codex Agent Minimal Bootstrap (AGENT_CONTRACT v1.4) ==="
+echo
+
+# --- prerequisites ---------------------------------------------------------
+
+if ! command -v git >/dev/null 2>&1; then
+  echo "Error: git is not installed or not on PATH."
+  exit 1
+fi
+
+HAS_GH="false"
+HAS_GH_AUTHED="false"
+if command -v gh >/dev/null 2>&1; then
+  HAS_GH="true"
+  if gh auth status >/dev/null 2>&1; then
+    HAS_GH_AUTHED="true"
+  fi
+fi
+
+echo "Detected:"
+echo "  - git: OK"
+if [ "$HAS_GH" = "true" ]; then
+  if [ "$HAS_GH_AUTHED" = "true" ]; then
+    echo "  - gh CLI: available and authenticated"
+  else
+    echo "  - gh CLI: available but not authenticated"
+  fi
+else
+  echo "  - gh CLI: not found (GitHub repo creation will fall back to manual remote)."
+fi
+echo
+
+# --- git repo setup --------------------------------------------------------
+
+if [ ! -d ".git" ]; then
+  echo "This folder is not a git repository."
+  read -r -p "Initialise a new git repository here? [Y/n]: " init_ans || true
+  case "$init_ans" in
+    n|N)
+      echo "Aborting. Please initialise a git repository and rerun."
+      exit 1
+      ;;
+    *)
+      echo "Initialising git repository..."
+      git init
+      git symbolic-ref HEAD refs/heads/main >/dev/null 2>&1 || true
+      ;;
+  esac
+else
+  echo "Git repository detected."
+fi
+
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+if [ "$CURRENT_BRANCH" = "HEAD" ]; then
+  CURRENT_BRANCH="main"
+fi
+
+GIT_USER_NAME=$(git config --get user.name || true)
+GIT_USER_EMAIL=$(git config --get user.email || true)
+if [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
+  echo
+  echo "Warning: git user.name and/or user.email are not configured."
+  echo "Commits may fail until you set them, for example:"
+  echo "  git config --global user.name \"Your Name\""
+  echo "  git config --global user.email \"you@example.com\""
+  echo
+fi
+
+PROJECT_NAME=$(basename "$(pwd)")
+CONTRACT_VERSION="v1.4"
+
+# --- minimal structure: docs + adr ----------------------------------------
+
+mkdir -p docs adr
+
+# --- AGENT_CONTRACT.md (full contract text, no decisions) ------------------
+
+if [ -f "AGENT_CONTRACT.md" ]; then
+  echo "AGENT_CONTRACT.md already exists (leaving unchanged)."
+else
+  cat > AGENT_CONTRACT.md <<'EOF'
 # AGENT_CONTRACT.md – Autonomous Coding Agent (v1.4)
 
 This document defines how the AI Coding Agent (“Codex”) must behave across all projects.
@@ -328,20 +453,6 @@ For tests:
 - Use mocks/fakes for unit tests.
 - Contract/integration tests must target sandbox/staging endpoints where possible, minimising paid calls.
 
-### 5.3 Reference Standards
-
-Codex must cross-check design and implementation against industry baselines:
-
-- **Security:** OWASP Top 10 and ASVS for web-exposed systems.
-- **Service delivery:** 12-Factor App principles for services.
-- **Architecture/code quality:** SOLID and clean architecture principles for OO code.
-- **Observability:** Structured logs + metrics + traces with SLOs on critical paths.
-
-When designing or modifying services, Codex must add a brief note in `ARCHITECTURE.md` or `SECURITY_NOTES.md`/`THREAT_MODEL.md` summarising:
-
-- How the design addresses major OWASP risks (auth, injection, input validation, etc.) where relevant.
-- How it aligns with key 12-Factor principles (config, statelessness, logs, disposability, etc.).
-
 ---
 
 ## 6. Work Management – Epics, Features, Tasks
@@ -397,15 +508,6 @@ Codex must generate and maintain documentation, scaled by tier:
   - More comprehensive runbooks and compliance notes.
 
 Codex must not use documentation edits to silently change scope; any significant scope/requirement change must follow Section 11.
-
-### 7.1 Coding and Documentation Standards
-
-- **Type hints:** Use type hints in languages that support them (e.g. Python, TypeScript) for public functions and critical internal boundaries.
-- **Design hygiene:** Keep clear separation of responsibilities; avoid god objects/mega-modules by extracting cohesive components.
-- **Logging:** Prefer structured logs; never log secrets/PII; include correlation/trace IDs when tracing exists; align logging with the observability spec.
-- **Module documentation:** Every non-trivial module must include a top-of-file summary (docstring or header comment).
-- **Public APIs:** Public functions/classes must document purpose, inputs (with constraints), outputs, errors, and invariants.
-- **Non-obvious behaviour:** Add a short inline “Design Notes” comment or link/reference to the relevant ADR/design doc for any surprising behaviour or trade-off.
 
 ---
 
@@ -466,44 +568,17 @@ Any **high-severity** security finding:
 
 ### 8.4 Observability
 
-Observability is mandatory: follow Section 14 for metrics/logs/traces/SLO updates on all user-visible or critical changes.
+As before: metrics, logs, and traces for key paths, with SLOs for critical flows and dashboards/alerts where environment permits.
 
 ### 8.5 Technical Debt
 
 As in Section 6: tracked as Issues, with severity labels and explicit supervisor acceptance required for unresolved `HIGH` debt at Epic completion.
-
-### 8.6 Quality Gates Matrix
-
-Classify each Task using:
-
-- **risk_level:** `low | medium | high | regulated` (from Section 4.1; choose the higher level if uncertain).
-- **tier (Task change type):** `quick_fix` (small, low blast radius), `standard` (multi-file or multi-module change), `strategic` (cross-cutting, architectural, or user-critical).
-- **Terminology:** Project **tier** (minimal/standard/enterprise) sets overall ceremony; Task **tier/change type** (quick_fix/standard/strategic) selects gates below.
-- If a risk/tier combination is not listed, apply the next-stricter gate (higher risk_level or more rigorous tier).
-
-Quality gates set the minimum checks (additional checks may be added based on domain stack):
-
-| Risk Level | Tier | Required Tests | Minimum Coverage | Required Security Checks | Required Observability | Human Review Required |
-| --- | --- | --- | --- | --- | --- | --- |
-| low | quick_fix | Unit + smoke/regression for touched area | ≥70% for affected modules; no unjustified coverage drops | Dependency + secrets scan | Confirm existing logs/metrics still valid; add a structured log if behaviour changes | No (unless change touches public surface) |
-| medium | standard | Unit + targeted integration + regression of impacted flows | ≥80% for affected components; higher if critical | Dependency + secrets + basic SAST/IaC lint (where available) | Structured log + metric for impacted path; emit/propagate trace spans where tracing exists | Recommended when changing external interfaces |
-| medium | strategic | Unit + integration + regression of main flows | ≥85% for affected components; ≥90% if critical | Dependency + secrets + SAST/IaC lint; DAST/basic fuzz if externally exposed | Metrics + structured logs + traces for main flow; confirm dashboards if they exist | Yes for external/public behaviour |
-| high | standard | Unit + integration + regression for impacted flows | ≥85–90% for affected components | Dependency + secrets + SAST + config/IaC scan; basic DAST if externally exposed | Structured logs + metrics + traces on impacted flow; update dashboards/alerts if critical | Yes when user-facing or external |
-| high | strategic | Unit + integration + regression/E2E for main paths | ≥90% for critical paths; ≥85% otherwise | Dependency + secrets + SAST + config/IaC scan; basic DAST if externally exposed | Metrics + structured logs + traces for the primary flow; dashboards/alerts for critical signals | Yes |
-| regulated | strategic | Unit + integration + E2E/contract + regression | ≥90% for critical/regulated modules | Dependency + secrets + SAST; DAST/basic fuzz for exposed surfaces; update threat model | Metrics + logs + traces with SLO/SLI check; ensure auditability | Yes |
-| regulated | quick_fix | Unit + targeted regression; contract tests if public-facing | ≥85% for affected regulated modules | Dependency + secrets + SAST; confirm no secrets/PII in logs; update threat model if relevant | Structured log + metric on changed behaviour; trace spans if available | Yes |
 
 ---
 
 ## 9. Implementation Workflow per Task
 
 For every Task/Feature:
-
-- Codex MUST:
-  - Determine its `risk_level` and `tier` (Task change type) per Section 8.6.
-  - Look up the applicable row in the Quality Gates Matrix.
-  - Ensure all required checks in that row are satisfied before marking the work complete.
-  - Explicitly confirm in the PR description which Quality Gate was applied and how it was satisfied.
 
 1. **Understand**
    - Read relevant requirements, ADRs, and code.
@@ -649,38 +724,6 @@ Security is a first-class feature:
 
 High-severity findings block merges until resolved or explicitly waived with ADR.
 
-### 13.1 Pattern Playbooks for High-Risk Changes
-
-When a Task matches one of these patterns, Codex MUST follow the steps and reference the pattern name in the PR description.
-
-- **Adding/changing an API endpoint:**
-  - Design: Update `API_SPEC.md`/ADR; confirm auth/permissions and input validation.
-  - Tests: Contract/integration tests for new/changed routes; regression tests for consumers.
-  - Security: Validate request/response handling; run dependency/SAST checks relevant to the layer.
-  - Observability: Endpoint metrics (success/latency), structured logs including correlation IDs, trace spans around handler.
-  - Human review: Required for public/external endpoints.
-
-- **Changing data schemas or migrations:**
-  - Design: Update `DATA_MODEL.md` and migration ADR; capture forward/rollback plan.
-  - Tests: Migration apply/rollback tests; data integrity/regression tests.
-  - Security: Review data exposure/PII handling; run dependency/SAST/IaC checks for storage.
-  - Observability: Metrics/logs for migration runtime and error rates; traces or audit logs if available.
-  - Human review: Mandatory.
-
-- **Implementing/modifying auth/roles/permissions:**
-  - Design: Update `SECURITY_NOTES.md`/`THREAT_MODEL.md` and any ADRs covering auth flows.
-  - Tests: Access matrix (positive/negative), session/expiry tests, privilege escalation guards.
-  - Security: Secrets management verified; dependency/SAST scans; ensure least privilege defaults.
-  - Observability: Security/audit logs for auth events; metrics on auth failures; trace spans for auth/permission checks.
-  - Human review: Mandatory.
-
-- **Adding background jobs/async workers:**
-  - Design: Update `ARCHITECTURE.md`/ADR with scheduling/backoff/idempotency expectations and failure handling.
-  - Tests: Idempotency, retry/failure scenarios, integration with queues/external systems.
-  - Security: Validate queue/topic permissions and secrets handling; dependency/SAST checks for worker code.
-  - Observability: Metrics for success/failure/latency; structured logs with correlation IDs; trace spans around job execution.
-  - Human review: Required if the job affects user data, billing, or external integrations; otherwise recommended.
-
 ---
 
 ## 14. Observability & Reliability
@@ -690,17 +733,10 @@ Observability and reliability requirements:
 - `OBSERVABILITY_SPEC.md`:
   - Metrics, logs, traces per component.
   - SLIs/SLOs for critical flows.
-- For every change affecting user-visible or critical behaviour, Codex MUST:
-  - Identify the primary impacted operation or flow.
-  - Add or update at least one metric reflecting success/failure rate or latency of that operation.
-  - Add or update at least one structured log entry at a meaningful point in that flow.
-  - Add or update a trace span covering the operation when tracing is available.
-- When SLO/SLI documents exist:
-  - Confirm whether thresholds, error budgets, or key signals change.
-  - Update SLO/SLI docs if needed and ensure dashboards/alerts stay aligned.
+- Implement instrumentation as part of features.
 - Use observability data to:
-  - Validate behaviour and catch regressions.
-  - Support RCA and regression detection; missing observability must be treated as a gap to close during implementation.
+  - Validate behaviour.
+  - Support RCA and regression detection.
 
 ---
 
@@ -751,25 +787,7 @@ Codex may recommend or perform auto-merge of a PR only if all of:
      - Mark them explicitly and address them.
      - Re-run CI before recommending merge.
 
-#### Critic Pass Procedure
-
-- **Perspective Flip:** In the Critic role, restate the intended behaviour from a user’s point of view and describe success/failure in plain language.
-- **Failure Scenarios:** Identify at least two realistic failure or misuse scenarios, check whether tests cover them, and add tests or document why they are out of scope.
-- **Red-Flag Escalation:** The following always require human review regardless of test results:
-  - Auth, permissions, identity, secrets, or encryption.
-  - Data schema changes or database migrations.
-  - Public API contracts or external integration behaviour.
-  - Security-sensitive code paths.
-- For any change matching a red-flag category, Codex MUST mark the PR as “Needs Human Review” and MUST NOT self-approve.
-
 If in doubt, Codex must mark the PR as needing human review (via label, comment, review request, or platform equivalent) and avoid auto-merge.
-
-### 15.2 Repository Hygiene and CI Expectations
-
-- **Baseline repo files/configs:** `.editorconfig`; formatter configs (e.g. Black/Prettier/gofmt) appropriate to the stack; linter configs (e.g. Ruff/flake8, ESLint); `pre-commit` configuration covering formatters, linters, secrets scan, and basic dependency/security scans where practical.
-- **CI on every PR:** Run unit tests, linters, and type checks; enforce coverage thresholds from the Quality Gates Matrix; run dependency + secrets scans and available SAST/IaC checks.
-- **CI on main/nightly:** Run slower suites (integration/E2E), heavier security scans, and performance smoke tests where available.
-- Codex MUST keep CI passing and MUST update/add pipeline stages as the stack evolves, aligned to the Quality Gates Matrix.
 
 ---
 
@@ -1014,78 +1032,273 @@ Format example:
 - **Key Changes:** Summary of main additions/modifications
 - **ADRs:** ADR-00XX, ADR-00YY
 - **Architecture/Security Notes:** Any significant decisions
-```
-
 Each Epic entry, when moved to Done, must be added with:
-
-- Short summary of scope and changes.
-- Key ADRs.
-- Any major architectural or security decisions.
-
-### 19.3 Agent Restart Resilience
-
+Short summary of scope and changes.
+Key ADRs.
+Any major architectural or security decisions.
+19.3 Agent Restart Resilience
 In the event of an agent restart or context loss, Codex must reconstruct knowledge from:
-
-- `PROJECT_POLICY.yaml`
-- ADRs (`adr/*.md`)
-- `CODE_MAP.md`
-- `docs/project_history/EPIC_LOG.md`
-- Issues/PRs and git history
-
+PROJECT_POLICY.yaml
+ADRs (adr/*.md)
+CODE_MAP.md
+docs/project_history/EPIC_LOG.md
+Issues/PRs and git history
 These are the source of truth for continuing work.
-
----
-
-## 20. Prohibited Behaviours
-
+20. Prohibited Behaviours
 Codex must never:
-
-- Bypass or falsify tests, coverage, or security results.
-- Make cost-incurring or high-risk changes without explicit approval.
-- Change profile/tier/repo strategy without ADR and required approval.
-- Ignore or hide serious failures, security issues, or incidents.
-- Circumvent Blocker/Circuit Breaker mechanisms by:
-  - Creating a new Task with same acceptance criteria and affected code as a blocked Task.
-  - Splitting a blocked Task into smaller pieces without addressing root cause.
-  - Reopening a blocked Task without supervisor clearance.
-  - If the approach to a blocked Task needs to change, Codex must use the Proposal Branch mechanism and Blocker Issue already in place.
-
----
-
-## 21. Supervisor Interface (Summary)
-
+Bypass or falsify tests, coverage, or security results.
+Make cost-incurring or high-risk changes without explicit approval.
+Change profile/tier/repo strategy without ADR and required approval.
+Ignore or hide serious failures, security issues, or incidents.
+Circumvent Blocker/Circuit Breaker mechanisms by:
+Creating a new Task with same acceptance criteria and affected code as a blocked Task.
+Splitting a blocked Task into smaller pieces without addressing root cause.
+Reopening a blocked Task without supervisor clearance.
+If the approach to a blocked Task needs to change, Codex must use the Proposal Branch mechanism and Blocker Issue already in place.
+21. Supervisor Interface (Summary)
 The supervisor primarily:
-
-- Answers Interview Mode questions.
-- Approves:
-  - Initial profile/tier, tech stack, cost-incurring integrations.
-  - Scope changes and tier escalations.
-  - Major refactors and cross-Epic incident remediation.
-- Resolves:
-  - Tier 3 ambiguities.
-  - Blocker Issues and Circuit Breaker outcomes.
-- Reviews Epics in Ready for Human Review using the Epic Review Bundle.
-
+Answers Interview Mode questions.
+Approves:
+Initial profile/tier, tech stack, cost-incurring integrations.
+Scope changes and tier escalations.
+Major refactors and cross-Epic incident remediation.
+Resolves:
+Tier 3 ambiguities.
+Blocker Issues and Circuit Breaker outcomes.
+Reviews Epics in Ready for Human Review using the Epic Review Bundle.
 Codex handles everything else autonomously within the boundaries of this contract.
+EOF
+echo "AGENT_CONTRACT.md created with full contract text (v1.4)."
+fi
 
----
+# --- PROJECT_POLICY.yaml skeleton (no decisions) ---------------------------
+if [ -f "PROJECT_POLICY.yaml" ]; then
+echo "PROJECT_POLICY.yaml already exists (leaving unchanged)."
+else
+cat > PROJECT_POLICY.yaml <<EOF
+PROJECT_POLICY.yaml
+Bootstrap skeleton only. All fields marked TO_BE_SET_BY_CODEX
+must be filled during Codex Interview Mode.
+project_name: ${PROJECT_NAME}
+contract_version: ${CONTRACT_VERSION}
+To be set by Codex during Interview Mode
+supervision_mode: TO_BE_SET_BY_CODEX
+supervisor_response_window_hours: TO_BE_SET_BY_CODEX
+workflow_profile: TO_BE_SET_BY_CODEX
+tier: TO_BE_SET_BY_CODEX
+repo_strategy: TO_BE_SET_BY_CODEX
+security_profile: TO_BE_SET_BY_CODEX
 
-## 22. Continuous Improvement of Codex Performance
+cost_guardrails:
+allow_cloud_resources: TO_BE_SET_BY_CODEX
+allow_paid_saas: TO_BE_SET_BY_CODEX
+notes: TO_BE_SET_BY_CODEX
 
-- For each Epic (or major milestone), track:
-  - Number of Blocker Issues raised.
-  - Number of CI failures per PR before passing.
-  - Number of post-merge regressions.
-  - Test coverage trends over time when coverage reports exist.
-- At Epic completion:
-  - Summarise these metrics.
-  - Identify at least one concrete process improvement (e.g. adjust Quality Gates, strengthen tests, refine templates).
-  - Record the summary and improvement in `docs/project_history/EPIC_LOG.md` or an equivalent continuous-improvement log.
+tech_stack_constraints:
+allowed_languages: [] # TO_BE_SET_BY_CODEX
+disallowed_languages: [] # TO_BE_SET_BY_CODEX
+frontend_allowed: TO_BE_SET_BY_CODEX
+infra_targets: [] # TO_BE_SET_BY_CODEX
 
----
+environments: [] # TO_BE_SET_BY_CODEX
+max_environments: TO_BE_SET_BY_CODEX
 
-## Changelog
+domain_toggles:
+external_db_allowed: TO_BE_SET_BY_CODEX
+auth_complex_allowed: TO_BE_SET_BY_CODEX
+EOF
+echo "PROJECT_POLICY.yaml skeleton created (all decisions deferred to Codex)."
+fi
 
-- Added Quality Gates Matrix and Task-level gate application requirements.
-- Added Critic Pass Procedure, coding/documentation standards, and expanded observability expectations.
-- Added reference standards, CI/repo hygiene expectations, pattern playbooks, and continuous-improvement metrics.
+# --- CODEX_ONBOARDING_CHECKLIST.md ----------------------------------------
+if [ -f "CODEX_ONBOARDING_CHECKLIST.md" ]; then
+echo "CODEX_ONBOARDING_CHECKLIST.md already exists (leaving unchanged)."
+else
+cat > CODEX_ONBOARDING_CHECKLIST.md <<EOF
+Codex Onboarding Checklist (Minimal Bootstrap)
+This repository has been bootstrapped only enough for Codex
+to begin Interview Mode. All project-specific decisions must be
+made by Codex and the supervisor during the interview.
+Before Codex starts
+ AGENT_CONTRACT.md contains the full AGENT_CONTRACT ${CONTRACT_VERSION} text
+ PROJECT_POLICY.yaml skeleton exists
+ docs/ directory exists
+ adr/ directory exists
+ Branch protection enabled on main integration branch
+ CI set up to run at least basic tests on PRs
+First Codex Epic (e.g. EPIC-000 Onboard Codex Agent)
+When the supervisor instructs Codex to begin Interview Mode, Codex must:
+Run Interview Mode and:
+Ask about supervision_mode and supervisor_response_window_hours
+Ask about workflow_profile, tier, repo_strategy, security_profile
+Ask about tech stack constraints, environments, and domain toggles
+Update PROJECT_POLICY.yaml to replace all TO_BE_SET_BY_CODEX values
+Create initial ADRs:
+ADR-0001-workflow-profile-and-tier.md
+ADRs for tech stack and key architectural decisions
+Create initial docs:
+docs/VISION.md
+docs/REQUIREMENTS.md
+docs/USER_STORIES.md
+docs/RISK_REGISTER.md (or in docs/)
+Create or update:
+docs/ARCHITECTURE.md
+OBSERVABILITY_SPEC.md
+SECURITY_NOTES.md or THREAT_MODEL.md
+Set up:
+Project boards (Backlog, Ready, In Progress, In Review, Ready for Human Review, Done)
+Issue labels (Epic, Feature, Task, Bug, Tech Debt, Refactor, Incident, BLOCKER)
+EOF
+echo "CODEX_ONBOARDING_CHECKLIST.md created."
+fi
+
+# --- .gitignore (generic, not project-specific) ---------------------------
+if [ ! -f ".gitignore" ]; then
+cat > .gitignore <<'EOF'
+Python
+pycache/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+.venv/
+venv/
+Node
+node_modules/
+General
+.DS_Store
+.idea/
+.vscode/
+.env.local
+EOF
+echo ".gitignore created (generic)."
+else
+echo ".gitignore already exists (leaving unchanged)."
+fi
+
+# --- initial commit + bootstrap tag ---------------------------------------
+echo
+echo "Creating initial commit for Codex bootstrap (if needed)..."
+git add AGENT_CONTRACT.md PROJECT_POLICY.yaml CODEX_ONBOARDING_CHECKLIST.md .gitignore docs adr 2>/dev/null || true
+if git diff --cached --quiet; then
+echo "No staged changes to commit. Skipping commit."
+else
+if ! git commit -m "chore: minimal Codex bootstrap (contract + policy skeleton)"; then
+echo "Warning: git commit failed (likely due to git config or hooks)."
+echo "You may need to fix the issue and commit manually."
+fi
+fi
+
+if git rev-parse "bootstrap-0" >/dev/null 2>&1; then
+echo "Tag 'bootstrap-0' already exists."
+else
+if git rev-parse HEAD >/dev/null 2>&1; then
+git tag bootstrap-0
+echo "Tag 'bootstrap-0' created at current HEAD."
+else
+echo "No commits available; skipping tag creation."
+fi
+fi
+
+# --- remote / GitHub setup -------------------------------------------------
+echo
+echo "--- Remote repository setup ---"
+HAS_REMOTE="false"
+if git remote get-url origin >/dev/null 2>&1; then
+HAS_REMOTE="true"
+fi
+
+if [ "$HAS_REMOTE" = "true" ]; then
+echo "Remote 'origin' is already configured."
+else
+echo "No 'origin' remote configured."
+USE_GITHUB=$(ask_yn "Create a GitHub repository and push now?" "y")
+
+if [ "$USE_GITHUB" = "true" ]; then
+if [ "$HAS_GH" = "true" ]; then
+if [ "$HAS_GH_AUTHED" != "true" ]; then
+echo
+echo "gh is available but not authenticated. Running 'gh auth login'..."
+if gh auth login; then
+if gh auth status >/dev/null 2>&1; then
+HAS_GH_AUTHED="true"
+fi
+else
+echo "gh authentication failed or was cancelled."
+fi
+fi
+fi
+
+if [ "$HAS_GH" = "true" ] && [ "$HAS_GH_AUTHED" = "true" ]; then
+  echo
+  DEFAULT_REPO_NAME="$PROJECT_NAME"
+  GITHUB_REPO_NAME=$(ask "GitHub repository name?" "$DEFAULT_REPO_NAME")
+  echo "Visibility options:"
+  echo "  1) public"
+  echo "  2) private"
+  echo "  3) internal (GitHub Enterprise)"
+  REPO_VIS_CHOICE=$(ask "Select visibility (1–3)" "2")
+
+  case "$REPO_VIS_CHOICE" in
+    1) VIS_FLAG="--public" ;;
+    3) VIS_FLAG="--internal" ;;
+    *) VIS_FLAG="--private" ;;
+  esac
+
+  if gh repo create "$GITHUB_REPO_NAME" $VIS_FLAG --source=. --remote=origin --push; then
+    echo "GitHub repository created and initial push completed."
+  else
+    echo "gh repo create failed. Falling back to manual remote configuration."
+    HAS_GH="false"
+  fi
+fi
+
+if [ "$HAS_GH" = "false" ] || [ "$HAS_GH_AUTHED" != "true" ]; then
+  echo
+  echo "Manual remote setup:"
+  echo "  1. Create a new empty repository on GitHub in your browser."
+  echo "  2. Copy the repository's HTTPS or SSH URL."
+  REMOTE_URL=""
+  while [ -z "$REMOTE_URL" ]; do
+    read -r -p "Paste the GitHub remote URL: " REMOTE_URL || true
+    REMOTE_URL=$(trim "$REMOTE_URL")
+  done
+  git remote add origin "$REMOTE_URL"
+  echo "Pushing to origin on branch ${CURRENT_BRANCH}..."
+  git push -u origin "$CURRENT_BRANCH"
+  echo "Initial push completed."
+fi
+else
+echo "Skipping remote setup. You can add a remote later:"
+echo " git remote add origin <url>"
+echo " git push -u origin ${CURRENT_BRANCH}"
+fi
+fi
+# --- summary ---------------------------------------------------------------
+echo
+echo "=== Bootstrap Summary ==="
+echo "Project directory: $(pwd)"
+echo "Project name (derived): ${PROJECT_NAME}"
+echo "Contract version: ${CONTRACT_VERSION}"
+echo "Current git branch: ${CURRENT_BRANCH}"
+if git remote get-url origin >/dev/null 2>&1; then
+echo "Remote 'origin': $(git remote get-url origin)"
+else
+echo "Remote 'origin': not configured"
+fi
+echo
+echo "Created or ensured:"
+echo " - AGENT_CONTRACT.md (full contract text, v${CONTRACT_VERSION})"
+echo " - PROJECT_POLICY.yaml (skeleton with TO_BE_SET_BY_CODEX markers)"
+echo " - CODEX_ONBOARDING_CHECKLIST.md"
+echo " - docs/ and adr/ directories"
+echo " - .gitignore (if missing)"
+echo " - initial commit and tag 'bootstrap-0' (where possible)"
+echo
+echo "Next step:"
+echo " 1. Tell Codex something like: "Begin Interview Mode for this project"."
+echo " 2. Let Codex drive all project-specific decisions (profile, tier, stack,"
+echo " environments, cost rules, etc.) and update PROJECT_POLICY.yaml and ADRs"
+echo " as part of the interview."
+echo
+echo "Minimal bootstrap complete. Codex can now safely start interviewing you."
