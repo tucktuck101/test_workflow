@@ -43,7 +43,7 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         response_model=GameStartResponse,
         responses={429: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
     )
-    def start_game(request: Request):
+    def start_game(request: Request) -> GameStartResponse:
         client_id = request.client.host if request.client else "anonymous"
         try:
             rate_limiter.allow(client_id)
@@ -81,7 +81,7 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
             503: {"model": ErrorResponse},
         },
     )
-    def make_move(game_id: str, payload: MoveRequest, request: Request):
+    def make_move(game_id: str, payload: MoveRequest, request: Request) -> MoveResponse:
         session = session_store.get(game_id)
         if session is None:
             raise_http("game_not_found")
@@ -94,6 +94,7 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
 
         if not loader.ready:
             raise_http("model_not_ready")
+        assert session is not None  # for type checker
         with obs.span("game.move", {"game_id": session.game_id}):
             try:
                 player_result = engine.apply_player_move(session, (payload.x, payload.y))
@@ -131,10 +132,11 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         response_model=QuitResponse,
         responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
     )
-    def quit_game(game_id: str, request: Request):
+    def quit_game(game_id: str, request: Request) -> QuitResponse:
         session = session_store.get(game_id)
         if session is None:
             raise_http("game_not_found")
+        assert session is not None
         if session.is_finished():
             raise_http("game_finished")
         engine.quit_game(session)
@@ -148,14 +150,14 @@ def get_health_router(settings: Settings, loader: ModelLoader) -> APIRouter:
     router = APIRouter(tags=["health"])
 
     @router.get("/health/live")
-    def live():
+    def live() -> dict:
         return {"status": "ok"}
 
     @router.get(
         "/health/ready",
         responses={503: {"model": ErrorResponse}},
     )
-    def ready():
+    def ready() -> dict:
         if not loader.ready:
             raise_http("model_not_ready", {"reason": loader.error})
         return readiness_payload(settings)
