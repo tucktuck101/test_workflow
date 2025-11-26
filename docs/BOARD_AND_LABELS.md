@@ -8,6 +8,10 @@
 ## Board (columns)
 - Backlog → Ready → In Progress → In Review → Ready for Human Review → Done.
 - Apply tag scheme: `epic-<id>-start`, `epic-<id>-feature-<name>-done`, `epic-<id>-complete`.
+- GitHub Project (v2) created: **Delivery Board** (project #6). Fields include:
+  - `Board Column` (single select): Backlog, Ready, In Progress, In Review, Ready for Human Review, Done.
+  - `Type` (single select): Epic, Feature, Task, Bug, Tech Debt, Refactor, Incident, BLOCKER.
+  - Use Status field as needed; prefer `Board Column` for workflow stage.
 
 ## Usage
 - Every issue/task includes: acceptance criteria, linked requirements/ADRs, risk level, task tier, Quality Gate row, DoD (tests/coverage/obs/docs/CI), dependencies, and Critic Pass reminder.
