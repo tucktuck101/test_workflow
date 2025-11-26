@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from .config import Settings
 from .model_loader import ModelLoader
+from .obs import Observability
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -15,10 +16,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         model_version=settings.model_version,
     )
     app.state.model_loader = loader
+    app.state.obs = Observability(settings)
 
     from .routes import get_health_router, get_router
 
-    app.include_router(get_router(app, settings, loader))
+    app.include_router(get_router(app, settings, loader, app.state.obs))
     app.include_router(get_health_router(settings, loader))
     return app
 

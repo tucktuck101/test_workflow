@@ -7,6 +7,7 @@ from .config import Settings
 from .errors import raise_http
 from .health import readiness_payload
 from .model_loader import ModelLoader
+from .obs import Observability
 from .rate_limit import SimpleRateLimiter
 from .schemas import (
     AgentMove,
@@ -30,7 +31,7 @@ def _render_hits(board_size: int, hits: dict) -> List[List[str]]:
     return board
 
 
-def get_router(app: FastAPI, settings: Settings, loader: ModelLoader) -> APIRouter:
+def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Observability) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["gameplay"])
     session_store = engine.InMemorySessionStore(settings.max_active_games)
     agent_adapter = agent.AgentAdapter(deterministic=settings.deterministic_mode)
@@ -50,12 +51,13 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader) -> APIRout
             raise_http("rate_limited", {"retry_after": 5})
         if not loader.ready:
             raise_http("model_not_ready")
-        try:
-            session = session_store.create(
-                board_size=settings.board_size, deterministic_seed=settings.deterministic_mode and 0 or None
-            )
-        except engine.InvalidMove:
-            raise_http("capacity_exceeded", {"retry_after": 5})
+        with obs.span("game.start"):
+            try:
+                session = session_store.create(
+                    board_size=settings.board_size, deterministic_seed=settings.deterministic_mode and 0 or None
+                )
+            except engine.InvalidMove:
+                raise_http("capacity_exceeded", {"retry_after": 5})
 
         player_board = _blank_board(settings.board_size)
         agent_board = _blank_board(settings.board_size)
@@ -92,22 +94,21 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader) -> APIRout
 
         if not loader.ready:
             raise_http("model_not_ready")
-        try:
-            player_result = engine.apply_player_move(session, (payload.x, payload.y))
-        except engine.InvalidMove as exc:
-            raise_http(str(exc))
-        except engine.GameFinished:
-            raise_http("game_finished")
+        with obs.span("game.move", {"game_id": session.game_id}):
+            try:
+                player_result = engine.apply_player_move(session, (payload.x, payload.y))
+            except engine.InvalidMove as exc:
+                raise_http(str(exc))
+            except engine.GameFinished:
+                raise_http("game_finished")
 
-        # Agent move (stub/deterministic)
-        try:
-            loader.assert_ready()
-            agent_coord = agent_adapter.next_move(session)
-            agent_result = engine.apply_agent_move(session, agent_coord)
-        except Exception:
-            raise_http("model_not_ready")
-        except engine.GameFinished:
-            pass
+            # Agent move (stub/deterministic)
+            try:
+                loader.assert_ready()
+                agent_coord = agent_adapter.next_move(session)
+                agent_result = engine.apply_agent_move(session, agent_coord)
+            except Exception:
+                raise_http("model_not_ready")
 
         response = MoveResponse(
             player_result=MoveResult(
