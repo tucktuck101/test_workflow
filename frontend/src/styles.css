@@ -122,8 +122,8 @@ a {
 }
 
 .board {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
