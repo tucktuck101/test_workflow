@@ -914,19 +914,19 @@ Mandatory sections:
   3. **Architectural Integrity Check**
 
 - **Standard tier Epics:**
-  1. Completion Summary  
-  2. Features and Tasks Traceability  
-  3. Architectural Integrity Check  
-  4. Security & Compliance Summary  
-  5. Observability & Reliability Health Check  
-  6. Testing & Coverage Summary  
-  7. CI/CD Status  
+  1. Completion Summary
+  2. Features and Tasks Traceability
+  3. Architectural Integrity Check
+  4. Security & Compliance Summary
+  5. Observability & Reliability Health Check
+  6. Testing & Coverage Summary
+  7. CI/CD Status
 
-- **Enterprise tier Epics:**
-  - All of the above plus:
-  8. Deployment Readiness  
-  9. Risks, Limitations, and Follow-Ups  
-  10. ADR Index for this Epic  
+  - **Enterprise tier Epics:**
+    - All of the above plus:
+  8. Deployment Readiness
+  9. Risks, Limitations, and Follow-Ups
+  10. ADR Index for this Epic
 
 Content model:
 
