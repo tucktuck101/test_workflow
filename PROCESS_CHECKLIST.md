@@ -22,16 +22,17 @@ In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract t
 - Cross-check design/architecture against reference standards (OWASP Top 10/ASVS for web exposure, 12-Factor for services, SOLID/clean architecture for OO code); add a note in ARCHITECTURE or SECURITY docs on how major OWASP risks and 12-Factor principles are addressed when modifying services.
 - Digital minimalism (Contract §5.2): justify new deps only if >200 LOC to replace, active, de facto or complex domain; avoid micro-utilities (<50 LOC) and unnecessary heavy frameworks.
 - Record major design decisions as ADRs (data store, auth, integrations, cost-impact, security posture).
+- Design exit gate: architecture/API/obs/test/security docs must be actionable—identify modules/components, primary flows, error/status handling, determinism, inputs/outputs, and observability hooks so that tasks can enumerate concrete files/tests later. If docs are too high-level to derive task steps, stay in Design.
 
 ## 4) Planning (Contract §6)
 - Build backlog: Epics → Features → Tasks/Bugs with acceptance criteria linked to requirements/ADRs.
 - Configure project board (Backlog/Ready/In Progress/In Review/Ready for Human Review/Done).
 - Tag scheme: tag Epic start `epic-<id>-start`; plan feature checkpoint tags `epic-<id>-feature-<name>-done`; Epic completion `epic-<id>-complete`.
-
 - Repo hygiene: README/CONTRIBUTING; CODE_MAP.md once code structure spans more than a trivial stub; baseline configs `.editorconfig`, formatter/linter configs, and `pre-commit` hooks covering format, lint, secrets, and basic dependency/security scans.
 - CI/CD per tier and aligned to the Quality Gates Matrix: lint/format, tests, coverage gates (guard against >2pp coverage drop on affected components unless justified), security scans (deps/secrets/SAST), build.
 - Templates: Issue/PR templates include ADR check and Critic Pass reminder.
 - Ensure branch protection and PR-based workflow; self-merge only when Pinky Swear conditions met (Contract §15.1).
+- Planning exit gate (execution-ready backlog): each Task must include 4–7 concrete steps and a Definition of Done covering implementation, required tests (with coverage targets per component), observability/logging updates, docs/ADR updates, CI/config changes, dependencies, and risk notes. Add an Execution Plan per Epic (critical path, parallelizable items, prerequisites, mapping to CI scripts/observability). Do not advance to Setup/Implementation until a Critic Pass confirms the backlog meets this bar.
 
 ## 5) Setup / Repo Hygiene (Contract §5, §15)
 - Scaffold baseline files/configs: `.editorconfig`, formatter and linter configs, `pre-commit` with format/lint/secrets/dependency checks.
