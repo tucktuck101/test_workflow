@@ -27,3 +27,6 @@ frontend-test:
 
 load-test:
 	k6 run load_tests/k6_load.js
+
+smoke:
+	./scripts/smoke.sh
