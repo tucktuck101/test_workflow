@@ -426,6 +426,7 @@ Codex must generate and maintain documentation, scaled by tier:
   - `CONFIGURATION.md`, `.env.example`
   - `DEPLOYMENT.md`, `RUNBOOKS.md` (for non-trivial ops)
   - `TROUBLESHOOTING.md`, `CHANGELOG.md`, ADR folder
+  - `SDR.md` (Software Design Review) consolidating interview outputs and BR/FR/NFR/US/ADRs into an actionable, canonical design reference
 - Documentation must align with BR/FR/NFR/US Issues; Issues remain the primary scope/traceability source.
 - **Enterprise:** Standard +:
   - Detailed threat model, incident playbooks.

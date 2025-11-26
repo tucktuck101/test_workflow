@@ -21,12 +21,12 @@ In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract t
 - Exit gate: risk/size/criticality documented; profile/tier validated; ADR for tech stack/runtime recorded; PROJECT_POLICY updated; key constraints/assumptions logged.
 
 ## 3) Design (Contract §3, §5)
-- Produce/refresh: VISION, REQUIREMENTS (F/NF), USER_STORIES (acceptance), ARCHITECTURE, DATA_MODEL, API_SPEC, TEST_STRATEGY, OBSERVABILITY_SPEC, SECURITY_NOTES/THREAT_MODEL (if high-risk/regulated or touching auth/PII/external integrations), DEPLOYMENT, CONFIGURATION/.env.example as soon as env/configs are introduced.
+- Produce/refresh: VISION, REQUIREMENTS (F/NF), USER_STORIES (acceptance), ARCHITECTURE, DATA_MODEL, API_SPEC, TEST_STRATEGY, OBSERVABILITY_SPEC, SECURITY_NOTES/THREAT_MODEL (if high-risk/regulated or touching auth/PII/external integrations), DEPLOYMENT, CONFIGURATION/.env.example as soon as env/configs are introduced, and a consolidated Software Design Review (`docs/SDR.md`) derived from interview outputs and aligned with BR/FR/NFR/US/ADRs.
 - Cross-check design/architecture against reference standards (OWASP Top 10/ASVS for web exposure, 12-Factor for services, SOLID/clean architecture for OO code); add a note in ARCHITECTURE or SECURITY docs on how major OWASP risks and 12-Factor principles are addressed when modifying services.
 - Digital minimalism (Contract §5.2): justify new deps only if >200 LOC to replace, active, de facto or complex domain; avoid micro-utilities (<50 LOC) and unnecessary heavy frameworks.
 - Record major design decisions as ADR Issues + ADR Files (data store, auth, integrations, cost-impact, security posture) linked to affected BR/FR/NFR/US/Epics/Features/Tasks.
 - Ensure design artefacts are traceable to BR/FR/NFR/US Issues; update docs to reflect the issue-set.
-- Design exit gate: architecture/API/obs/test/security docs must be actionable—identify modules/components, primary flows, error/status handling, determinism, inputs/outputs, and observability hooks so that tasks can enumerate concrete files/tests later. Key decisions (data store, auth, integrations, cost/security posture) are captured as ADR Issue + ADR File with impacted work-item links. If docs are too high-level to derive task steps, stay in Design.
+- Design exit gate: architecture/API/obs/test/security docs must be actionable—identify modules/components, primary flows, error/status handling, determinism, inputs/outputs, and observability hooks so that tasks can enumerate concrete files/tests later. Key decisions (data store, auth, integrations, cost/security posture) are captured as ADR Issue + ADR File with impacted work-item links. SDR.md generated/updated as the canonical design summary. If docs are too high-level to derive task steps, stay in Design.
 
 ## 4) Planning (Contract §6)
 - Build backlog: Epics → Features → Tasks/Bugs with acceptance criteria linked to requirements/ADRs and BR/FR/NFR/US Issues (per traceability model).

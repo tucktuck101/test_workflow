@@ -13,9 +13,17 @@
 - `init_codex_project.sh`, `reset_codex_init.sh`: bootstrap helpers.
 - `.editorconfig`, `.prettierrc.json`, `.pre-commit-config.yaml`, `pyproject.toml`: formatting/linting config for Python/JS and pre-commit.
 
-## Planned Code Structure (pending implementation)
-- `backend/` (planned): FastAPI app, game engine, session store, agent adapter, tests.
-- `frontend/` (planned): React/Vite app, components, API client, tests.
-- `training/` (planned): RL training pipeline scripts and artifacts.
+## Current Code Structure
+- `app/`: FastAPI scaffold and configuration.
+  - `config.py`: environment/config parsing and validation (paths, devices, limits).
+  - `main.py`: FastAPI app factory and uvicorn runner.
+- `tests/`: Python tests.
+  - `test_config.py`: settings/env validation and app smoke test.
+- `requirements.txt`: Python dependencies (fastapi, uvicorn, pytest).
+
+## Planned Additions
+- Backend gameplay modules: game engine, session store, agent adapter, API routes.
+- Frontend: React/Vite app, components, API client, tests.
+- Training: RL training pipeline scripts and artifacts.
 
 Update this map when scaffolding code and new modules are added.***

@@ -5,6 +5,7 @@
 - `API_HOST` (default: 0.0.0.0): Bind host.
 - `FRONTEND_ORIGIN` (optional): Allowed origin(s) for CORS.
 - `MODEL_PATH` (required): Filesystem path to the model artifact.
+- `MODEL_ROOT` (optional): Allowed root directory for model artifacts (default: parent directory of `MODEL_PATH`); `MODEL_PATH` must reside within this root.
 - `MODEL_VERSION` (required): Version string for the loaded model.
 - `MODEL_HASH` (required): SHA256 to verify model integrity.
 - `MODEL_DEVICE` (default: cpu): `cpu` or `cuda` if available.
