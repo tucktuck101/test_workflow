@@ -1,0 +1,30 @@
+PROJECT_POLICY.yaml
+Bootstrap skeleton only. All fields marked TO_BE_SET_BY_CODEX
+must be filled during Codex Interview Mode.
+project_name: Coding_Agent_worklfow
+contract_version: v1.4
+To be set by Codex during Interview Mode
+supervision_mode: TO_BE_SET_BY_CODEX
+supervisor_response_window_hours: TO_BE_SET_BY_CODEX
+workflow_profile: TO_BE_SET_BY_CODEX
+tier: TO_BE_SET_BY_CODEX
+repo_strategy: TO_BE_SET_BY_CODEX
+security_profile: TO_BE_SET_BY_CODEX
+
+cost_guardrails:
+allow_cloud_resources: TO_BE_SET_BY_CODEX
+allow_paid_saas: TO_BE_SET_BY_CODEX
+notes: TO_BE_SET_BY_CODEX
+
+tech_stack_constraints:
+allowed_languages: [] # TO_BE_SET_BY_CODEX
+disallowed_languages: [] # TO_BE_SET_BY_CODEX
+frontend_allowed: TO_BE_SET_BY_CODEX
+infra_targets: [] # TO_BE_SET_BY_CODEX
+
+environments: [] # TO_BE_SET_BY_CODEX
+max_environments: TO_BE_SET_BY_CODEX
+
+domain_toggles:
+external_db_allowed: TO_BE_SET_BY_CODEX
+auth_complex_allowed: TO_BE_SET_BY_CODEX
