@@ -7,6 +7,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     app = FastAPI(title="Battleship RL API", version=settings.model_version)
     app.state.settings = settings
+
+    from .routes import get_health_router, get_router
+
+    app.include_router(get_router(app, settings))
+    app.include_router(get_health_router(settings))
     return app
 
 

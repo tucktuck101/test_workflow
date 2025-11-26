@@ -1,0 +1,195 @@
+import enum
+import random
+import uuid
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
+
+Coordinate = Tuple[int, int]
+
+
+class GameStatus(str, enum.Enum):
+    IN_PROGRESS = "in_progress"
+    PLAYER_WON = "player_won"
+    AGENT_WON = "agent_won"
+    QUIT = "quit"
+    ABORTED = "aborted"
+
+
+class MoveOutcome(str, enum.Enum):
+    MISS = "miss"
+    HIT = "hit"
+    SUNK = "sunk"
+
+
+class InvalidMove(ValueError):
+    """Raised when a move is invalid (bounds, duplicate, or finished game)."""
+
+
+class GameFinished(ValueError):
+    """Raised when a move is attempted on a finished game."""
+
+
+@dataclass
+class Ship:
+    name: str
+    size: int
+    coordinates: List[Coordinate] = field(default_factory=list)
+    hits: List[Coordinate] = field(default_factory=list)
+
+    @property
+    def is_sunk(self) -> bool:
+        return len(self.hits) == self.size
+
+    def register_hit(self, coord: Coordinate) -> MoveOutcome:
+        if coord not in self.coordinates:
+            return MoveOutcome.MISS
+        if coord not in self.hits:
+            self.hits.append(coord)
+        return MoveOutcome.SUNK if self.is_sunk else MoveOutcome.HIT
+
+
+@dataclass
+class GameSession:
+    game_id: str
+    board_size: int
+    player_ships: List[Ship]
+    agent_ships: List[Ship]
+    player_board_hits: Dict[Coordinate, MoveOutcome] = field(default_factory=dict)
+    agent_board_hits: Dict[Coordinate, MoveOutcome] = field(default_factory=dict)
+    move_history: List[Dict] = field(default_factory=list)
+    status: GameStatus = GameStatus.IN_PROGRESS
+    deterministic_seed: Optional[int] = None
+
+    def is_finished(self) -> bool:
+        return self.status != GameStatus.IN_PROGRESS
+
+
+SHIP_SET = [
+    ("Carrier", 5),
+    ("Battleship", 4),
+    ("Cruiser", 3),
+    ("Submarine", 3),
+    ("Destroyer", 2),
+]
+
+
+def _place_ships(board_size: int, rng: random.Random) -> List[Ship]:
+    occupied = set()
+    ships: List[Ship] = []
+
+    for name, size in SHIP_SET:
+        placed = False
+        while not placed:
+            vertical = rng.choice([True, False])
+            if vertical:
+                x = rng.randint(0, board_size - 1)
+                y = rng.randint(0, board_size - size)
+                coords = [(x, y + i) for i in range(size)]
+            else:
+                x = rng.randint(0, board_size - size)
+                y = rng.randint(0, board_size - 1)
+                coords = [(x + i, y) for i in range(size)]
+            if any(c in occupied for c in coords):
+                continue
+            occupied.update(coords)
+            ships.append(Ship(name=name, size=size, coordinates=coords))
+            placed = True
+    return ships
+
+
+def _check_bounds(board_size: int, coord: Coordinate) -> None:
+    x, y = coord
+    if x < 0 or y < 0 or x >= board_size or y >= board_size:
+        raise InvalidMove("invalid_coordinates")
+
+
+def create_session(board_size: int, deterministic_seed: Optional[int] = None) -> GameSession:
+    rng = random.Random(deterministic_seed)
+    player_ships = _place_ships(board_size, rng)
+    agent_ships = _place_ships(board_size, rng)
+    return GameSession(
+        game_id=str(uuid.uuid4()),
+        board_size=board_size,
+        player_ships=player_ships,
+        agent_ships=agent_ships,
+        deterministic_seed=deterministic_seed,
+    )
+
+
+def _find_ship(ships: List[Ship], coord: Coordinate) -> Optional[Ship]:
+    for ship in ships:
+        if coord in ship.coordinates:
+            return ship
+    return None
+
+
+def _register_move(
+    session: GameSession,
+    actor: str,
+    target_ships: List[Ship],
+    board_hits: Dict[Coordinate, MoveOutcome],
+    coord: Coordinate,
+) -> Dict:
+    if session.is_finished():
+        raise GameFinished("game_finished")
+    _check_bounds(session.board_size, coord)
+    if coord in board_hits:
+        raise InvalidMove("duplicate_move")
+
+    ship = _find_ship(target_ships, coord)
+    if ship:
+        outcome = ship.register_hit(coord)
+    else:
+        outcome = MoveOutcome.MISS
+
+    board_hits[coord] = outcome
+    move_record = {"actor": actor, "x": coord[0], "y": coord[1], "outcome": outcome.value}
+    if ship and outcome != MoveOutcome.MISS:
+        move_record["ship"] = ship.name
+    session.move_history.append(move_record)
+    return move_record
+
+
+def apply_player_move(session: GameSession, coord: Coordinate) -> Dict:
+    """Apply a player move against the agent's board."""
+    result = _register_move(session, "player", session.agent_ships, session.agent_board_hits, coord)
+    if all(ship.is_sunk for ship in session.agent_ships):
+        session.status = GameStatus.PLAYER_WON
+    return result
+
+
+def apply_agent_move(session: GameSession, coord: Coordinate) -> Dict:
+    """Apply an agent move against the player's board."""
+    result = _register_move(session, "agent", session.player_ships, session.player_board_hits, coord)
+    if all(ship.is_sunk for ship in session.player_ships):
+        session.status = GameStatus.AGENT_WON
+    return result
+
+
+def quit_game(session: GameSession) -> None:
+    session.status = GameStatus.QUIT
+
+
+class InMemorySessionStore:
+    """Soft-cap in-memory session store (no TTL yet)."""
+
+    def __init__(self, max_active_games: Optional[int] = None) -> None:
+        self._sessions: Dict[str, GameSession] = {}
+        self._max = max_active_games
+
+    def create(self, board_size: int, deterministic_seed: Optional[int] = None) -> GameSession:
+        if self._max is not None and len(self._sessions) >= self._max:
+            raise InvalidMove("capacity_exceeded")
+        session = create_session(board_size, deterministic_seed)
+        self._sessions[session.game_id] = session
+        return session
+
+    def get(self, game_id: str) -> Optional[GameSession]:
+        return self._sessions.get(game_id)
+
+    def end(self, game_id: str) -> None:
+        self._sessions.pop(game_id, None)
+
+    @property
+    def active_count(self) -> int:
+        return len(self._sessions)
