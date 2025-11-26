@@ -16,7 +16,16 @@ export default defineConfig({
         functions: 70,
         lines: 75,
       },
-      exclude: ['src/main.tsx', 'src/types.ts'],
+      exclude: [
+        'src/main.tsx',
+        'src/types.ts',
+        'vite.config.ts',
+        'vitest.config.ts',
+        'playwright.config.ts',
+        'src/vite-env.d.ts',
+        'e2e/**',
+      ],
     },
+    exclude: ['e2e/**', 'node_modules/**'],
   },
 });

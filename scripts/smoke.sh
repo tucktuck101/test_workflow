@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "[smoke] Starting backend via docker compose..."
-docker compose up -d backend
+echo "[smoke] Starting backend+frontend via docker compose..."
+docker compose up -d backend frontend
 
 echo "[smoke] Waiting for readiness..."
 for i in {1..30}; do
