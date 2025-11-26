@@ -163,6 +163,15 @@
   - Dependencies: Compute (CPU/GPU), datasets.  
   - Limitations: Out of runtime scope; promotion must be manual/controlled for MVP.
 
+### RL Training Design (planned, FEAT-007)
+- **Environment:** Battleship board size configurable (default 10); observation is player/agent boards with hit/miss/sunk markers; action space = grid coordinates; episode ends on win/lose/quit; reward: positive for hit/sunk/win, small penalty per move to encourage efficiency.
+- **Baseline opponent:** Random/heuristic opponent for training/eval; deterministic seed support for tests.
+- **Model/Algorithm:** PyTorch policy/value network (e.g., small CNN/MLP on board grids). Start with CPU-first, optional CUDA flag. Algorithm: simple policy gradient (REINFORCE or DQN variant) to keep compute bounded.
+- **Training recipe:** Configurable episodes, LR, batch sizes. Two configs: mini-train for CI (tens of episodes, seconds to run, deterministic hash) and full-train for local/manual runs (documented, not in CI). Seeded for reproducibility.
+- **Evaluation:** Harness to play N games vs random/heuristic; report win rate and average moves. Sanity check: model must beat random by a margin; mini-train may just verify convergence directionally.
+- **Artifacts:** Emit weights file + `manifest.json` (version/hash/device/seed/board_size/hparams). Compatible with runtime validator/promotion flow.
+- **Guardrails:** CPU-only by default; no paid cloud/GPU without ADR; deterministic mini-train required for CI smoke.
+
 **Example flow (move):** Player `POST /api/games/{id}/moves` → API validates payload/state → Game Engine updates player board → Agent Adapter called (real or deterministic stub) → agent move returned → Game Engine updates agent board/status → Observability emits metrics/logs/traces → 200 response with outcomes/masked boards; errors handled per above.
 
 ## 7. Integration Design
