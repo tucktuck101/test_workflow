@@ -16,3 +16,15 @@
 - Observability: metrics/logging/tracing on key flows (game start, move handling, RL inference latency).
 - Performance: responsive turn handling; aim for low-latency move responses suitable for real-time play.
 - Cost: avoid paid SaaS/cloud during MVP; prefer open-source components suitable for self-hosting in k8s.
+
+## Out of Scope (MVP)
+- User accounts, leaderboards, persistence of game history.
+- Paid cloud services or managed SaaS.
+- Live model training in runtime environments (training is offline/separate).
+- Advanced rate limiting/throttling (planned, not delivered in MVP).
+
+## Delivery Priorities
+1) Backend gameplay API (start/move/quit) with authoritative rules and RL inference path (stubbed + real model load).
+2) Frontend play loop that consumes the API and surfaces errors/states.
+3) Observability/test coverage aligned to Quality Gates (medium/standard).
+4) Training pipeline/bootstrap to produce versioned model artifacts for runtime use.***
