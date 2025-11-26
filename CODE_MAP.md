@@ -33,6 +33,7 @@
   - `test_rate_limit.py`: rate-limit guard tests.
   - `test_agent.py`: deterministic agent tests.
   - `test_routes.py`: gameplay API happy/error/capacity/idempotent and inference-failure cases.
+  - `test_session_store.py`: session store TTL/end behavior.
   - `test_main.py`: CORS middleware behavior and preflight checks.
 - `requirements.txt`: Python dependencies (fastapi, uvicorn, pytest, mypy, otel).
 - `Makefile`: common tasks (backend coverage/typecheck, frontend tests, load test stub).
@@ -52,8 +53,11 @@
 - `.devcontainer/`: VS Code devcontainer for Python 3.11 + Node 20 setup.
 - `training/`: stub training pipeline.
   - `config.py`: training config/env parsing.
-  - `trainer.py`: deterministic stub training that emits artifact + manifest (hash/version/device).
-  - `tests/test_training.py`: verifies deterministic artifact and manifest/hash and validate tool.
+  - `env.py`: Battleship training environment with rewards/actions.
+  - `policy.py`: simple Q-learning policy.
+  - `trainer.py`: trains policy and emits artifact + manifest (hash/version/device/episodes/hparams).
+  - `eval.py`: evaluate trained policy.
+  - `tests/test_training.py`: verifies deterministic artifact/manifest, validator, env rewards, and eval.
   - `tools/validate_artifact.py`: CLI to validate artifact vs manifest/hash/root/device for promotion checks.
 - `.github/workflows/artifact-validate.yml`: manual workflow to run artifact validation CLI for promotions.
 - `app/rate_limit.py`: token bucket limiter with RateLimitExceeded.

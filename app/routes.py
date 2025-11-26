@@ -1,9 +1,10 @@
 import time
 from typing import List
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request, Body
 
 from . import agent, engine
+from .config import Settings
 from .config import Settings
 from .errors import raise_http
 from .health import readiness_payload
@@ -18,6 +19,7 @@ from .schemas import (
     MoveResponse,
     MoveResult,
     QuitResponse,
+    Placement,
 )
 
 
@@ -34,8 +36,11 @@ def _render_hits(board_size: int, hits: dict) -> List[List[str]]:
 
 def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Observability) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["gameplay"])
-    session_store = engine.InMemorySessionStore(settings.max_active_games)
-    agent_adapter = agent.AgentAdapter(deterministic=settings.deterministic_mode)
+    session_store = engine.InMemorySessionStore(settings.max_active_games, ttl_seconds=3600)
+    policy_path = None
+    if settings.model_path.exists() and settings.deterministic_mode is False:
+        policy_path = settings.model_path
+    agent_adapter = agent.AgentAdapter(deterministic=settings.deterministic_mode, policy_path=policy_path)
     rate_limiter = SimpleRateLimiter(capacity=5, refill_rate_per_sec=1.0, retry_after=5)
     rate_limit_hits = 0
 
@@ -44,7 +49,7 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         response_model=GameStartResponse,
         responses={429: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
     )
-    def start_game(request: Request) -> GameStartResponse:
+    def start_game(request: Request, placements: List[Placement] | None = Body(default=None, embed=True)) -> GameStartResponse:
         client_id = request.client.host if request.client else "anonymous"
         try:
             rate_limiter.allow(client_id)
@@ -55,9 +60,21 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
             raise_http("model_not_ready")
         with obs.span("game.start"):
             try:
-                session = session_store.create(
-                    board_size=settings.board_size, deterministic_seed=settings.deterministic_mode and 0 or None
-                )
+                if placements:
+                    ships = [
+                        engine.Ship(name=p.name, size=len(p.coordinates), coordinates=[tuple(c) for c in p.coordinates])
+                        for p in placements
+                    ]
+                    engine.validate_placements(settings.board_size, ships)
+                    session = engine.create_session_with_player(
+                        board_size=settings.board_size,
+                        placements=ships,
+                        deterministic_seed=settings.deterministic_mode and 0 or None,
+                    )
+                else:
+                    session = session_store.create(
+                        board_size=settings.board_size, deterministic_seed=settings.deterministic_mode and 0 or None
+                    )
             except engine.InvalidMove:
                 raise_http("capacity_exceeded", {"retry_after": 5})
 

@@ -3,6 +3,11 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class Placement(BaseModel):
+    name: str
+    coordinates: List[List[int]]
+
+
 class GameStartResponse(BaseModel):
     game_id: str
     board: List[List[str]]
