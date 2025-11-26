@@ -1,48 +1,25 @@
 import hashlib
 import json
 import os
-import random
-from dataclasses import asdict
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 from .config import TrainConfig
-
-
-class StubModel:
-    """Tiny stub model whose 'training' is seeded RNG; produces deterministic bytes."""
-
-    def __init__(self, seed: int, board_size: int) -> None:
-        self.seed = seed
-        self.board_size = board_size
-
-    def train(self, epochs: int, lr: float) -> None:
-        random.seed(self.seed)
-        # Simulate training by advancing RNG.
-        for _ in range(epochs * 10):
-            random.random()
-        self.lr = lr
-
-    def export(self) -> bytes:
-        random.seed(self.seed)
-        payload = {
-            "seed": self.seed,
-            "board_size": self.board_size,
-            "lr": getattr(self, "lr", None),
-        }
-        return json.dumps(payload, sort_keys=True).encode()
+from .env import BattleshipEnv
+from .policy import QLearner
 
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def write_artifact(output: Path, data: bytes) -> str:
-    output.write_bytes(data)
-    return sha256_bytes(data)
+def write_artifact(output: Path, policy: Dict[str, float]) -> str:
+    payload = json.dumps(policy, sort_keys=True).encode()
+    output.write_bytes(payload)
+    return sha256_bytes(payload)
 
 
-def write_manifest(output_dir: Path, artifact_path: Path, config: TrainConfig, hash_value: str) -> Path:
+def write_manifest(output_dir: Path, artifact_path: Path, config: TrainConfig, hash_value: str, rewards: List[float]) -> Path:
     manifest = {
         "version": config.version,
         "hash": hash_value,
@@ -50,6 +27,9 @@ def write_manifest(output_dir: Path, artifact_path: Path, config: TrainConfig, h
         "artifact": artifact_path.name,
         "board_size": config.board_size,
         "seed": config.seed,
+        "episodes": config.epochs,
+        "lr": config.lr,
+        "mean_reward": sum(rewards) / len(rewards) if rewards else 0.0,
     }
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
@@ -57,11 +37,12 @@ def write_manifest(output_dir: Path, artifact_path: Path, config: TrainConfig, h
 
 
 def run_training(config: TrainConfig) -> Dict[str, str]:
-    model = StubModel(seed=config.seed, board_size=config.board_size)
-    model.train(epochs=config.epochs, lr=config.lr)
+    env = BattleshipEnv(board_size=config.board_size, seed=config.seed)
+    learner = QLearner(env=env, epsilon=0.2, lr=config.lr)
+    rewards = learner.train(config.epochs)
     artifact_path = config.output_dir / config.artifact_name
-    artifact_hash = write_artifact(artifact_path, model.export())
-    manifest_path = write_manifest(config.output_dir, artifact_path, config, artifact_hash)
+    artifact_hash = write_artifact(artifact_path, learner.export_policy())
+    manifest_path = write_manifest(config.output_dir, artifact_path, config, artifact_hash, rewards)
     return {
         "artifact": str(artifact_path),
         "hash": artifact_hash,

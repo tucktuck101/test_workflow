@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from training.config import TrainConfig
+from training.env import BattleshipEnv
 from training.trainer import run_training, sha256_bytes
 from tools.validate_artifact import main as validate_main
 
@@ -12,8 +13,8 @@ def test_training_deterministic(tmp_path: Path):
         artifact_name="model.bin",
         seed=42,
         device="cpu",
-        epochs=1,
-        lr=0.01,
+        epochs=5,
+        lr=0.1,
         board_size=5,
         version="v-test",
     )
@@ -32,6 +33,7 @@ def test_training_deterministic(tmp_path: Path):
     assert manifest_data["version"] == "v-test"
     assert manifest_data["hash"] == digest
     assert manifest_data["device"] == "cpu"
+    assert manifest_data["episodes"] == cfg.epochs
     # deterministic export content
     cfg2 = cfg
     cfg2.seed = 42
@@ -81,3 +83,12 @@ def test_validate_artifact_hash_mismatch(tmp_path: Path, capsys):
     data = json.loads(capsys.readouterr().out)
     assert code == 1
     assert data["reason"] == "hash_mismatch"
+
+
+def test_env_step_rewards():
+    env = BattleshipEnv(board_size=3, seed=0, ships=[("Dest", 1)])
+    env.reset()
+    reward, done = env.step((0, 0))
+    # first move at least incurs step penalty
+    assert reward <= 1.0
+    assert done in {True, False}
