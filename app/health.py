@@ -16,8 +16,15 @@ def _sha256_file(path: Path) -> str:
 
 def readiness_payload(settings: Settings) -> Dict:
     path = settings.model_path
+    if settings.model_root:
+        try:
+            path.resolve().relative_to(settings.model_root.resolve())
+        except Exception:
+            raise_http("model_not_ready", {"reason": "path_outside_root"})
     if not path.exists():
         raise_http("model_not_ready", {"reason": "missing_model"})
+    if not path.is_file():
+        raise_http("model_not_ready", {"reason": "path_invalid"})
 
     try:
         digest = _sha256_file(path)

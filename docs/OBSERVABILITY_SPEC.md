@@ -44,3 +44,17 @@
 ## Alerts (draft)
 - Alert if move p95 latency > 500ms for 5 minutes (dev baseline), inference error rate > 1%, or readiness fails for >2 minutes.
 - Page/block PR if `model_ready` = 0 on startup; surface in CI smoke tests.
+
+## Dashboard & Alert Stubs (initial)
+- Panels (Grafana-style):
+  - Request rate/latency (p50/p95) for `/api/games` start and moves (stacked by status).
+  - RL inference latency histogram and error rate.
+  - Active games (gauge) and completions by outcome.
+  - Readiness state (model_ready) with version/hash labels.
+  - Backend resource utilization (CPU/mem) for container/pod.
+- Alerts (fast/slow burn):
+  - Slow burn: move p95 > 500ms for 15m.
+  - Fast burn: inference error rate > 1% for 5m.
+  - Readiness failing > 2m (model_ready = 0).
+  - Capacity nearing cap: active_games > 90% of `MAX_ACTIVE_GAMES`.
+- Ownership: Backend/infra team; page operator; warn-only for capacity/readiness in dev. Tune thresholds after baseline load test.

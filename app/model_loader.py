@@ -11,11 +11,13 @@ class ModelLoader:
     expected_hash: str
     device: str
     model_version: str
+    model_root: Optional[Path] = None
     ready: bool = False
     error: Optional[str] = None
 
     def __post_init__(self) -> None:
         try:
+            self._validate_root()
             self._validate_path()
             self._validate_hash()
             # Placeholder: in real implementation, load model here (PyTorch, etc.).
@@ -25,9 +27,19 @@ class ModelLoader:
             self.ready = False
             self.error = str(exc)
 
+    def _validate_root(self) -> None:
+        if self.model_root is None:
+            return
+        try:
+            self.model_path.resolve().relative_to(self.model_root.resolve())
+        except Exception:
+            raise ValueError("path_outside_root")
+
     def _validate_path(self) -> None:
         if not self.model_path.exists():
             raise FileNotFoundError("missing_model")
+        if not self.model_path.is_file():
+            raise ValueError("path_invalid")
 
     def _sha256(self) -> str:
         import hashlib

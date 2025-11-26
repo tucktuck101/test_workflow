@@ -1,25 +1,27 @@
-# Runbooks (MVP)
+# Runbooks
 
-## Startup/Deployment Checklist
-- Set env vars from `.env` or deployment config (`MODEL_PATH`, `MODEL_VERSION`, `MODEL_HASH`, `MODEL_DEVICE`, ports).
-- Ensure model artifact exists and hash matches.
-- Start backend (`uvicorn ...`), verify `/health/live` and `/health/ready`.
-- Start frontend pointing to backend origin.
-
-## Handling Model Load Failure
-- Symptom: `/health/ready` returns 503 with model load error.
+## Model Artifact Promotion (FEAT-006)
+- Preconditions:
+  - Candidate artifact + `manifest.json` (hash/version/device/seed/board) produced by training.
+  - Validation: `python -m tools.validate_artifact --artifact <path> --manifest <path> --root <allowed_root> --device <cpu|cuda>` must return status ok.
 - Steps:
-  - Check `MODEL_PATH` exists and readable; confirm hash matches expected.
-  - Validate device availability if using `cuda`; fall back to `cpu` if unavailable.
-  - Restart service after correcting path/hash/device.
+  1. Copy artifact + manifest into runtime artifact store (or image layer) under allowed root.
+  2. Update runtime config/env (`MODEL_PATH`, `MODEL_VERSION`, `MODEL_HASH`, `MODEL_DEVICE`, `MODEL_ROOT`) to point to candidate.
+  3. Deploy/update backend; wait for `/health/ready` to report ready with new version/hash.
+  4. Watch dashboards: readiness (model_ready), move latency p95, inference error rate, active games.
+  5. Announce promotion complete; note version/hash in CHANGELOG/EPIC_LOG if required.
+- Alerts/monitoring:
+  - Fast burn: inference error rate >1% (5m); move p95 >500ms (15m slow burn).
+  - Readiness failing >2m blocks rollout; investigate hash/path/device mismatch.
+  - Capacity nearing cap: active_games >90% of `MAX_ACTIVE_GAMES` (warn).
 
-## Investigating High Move Latency
-- Check metrics for move and inference latency (p95).
-- Inspect logs for validation errors or inference failures.
-- Verify model size and device selection; switch to deterministic/stubbed agent for debugging.
-- Run load test locally to reproduce; profile hot paths.
-
-## Game State Issues (desync/duplicates)
-- Confirm server rejects duplicates and finished games (API returns 400/409).
-- Inspect move history for given `game_id`.
-- If state is corrupted, end the game and start a new one; monitor for recurring patterns.
+## Model Artifact Rollback
+- Trigger: readiness fails after promotion or elevated error/latency beyond budget.
+- Steps:
+  1. Pin back to N-1 manifest: set `MODEL_PATH`, `MODEL_VERSION`, `MODEL_HASH`, `MODEL_DEVICE` to previous values (config/ConfigMap/env).
+  2. Deploy/update backend; verify `/health/ready` returns ready with N-1 version/hash.
+  3. Monitor dashboards/alerts for stability (readiness, move/inference latency/error).
+  4. Record rollback in EPIC_LOG and create follow-up issue for failed artifact.
+- Readiness failure handling:
+  - If validation fails (hash/path/device), stop traffic until rollback applied.
+  - Keep N-1 artifact/manifest available at all times for fast rollback.

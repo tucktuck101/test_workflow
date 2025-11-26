@@ -70,9 +70,6 @@ class Settings:
         if model_root not in (model_path, *model_path.parents):
             raise ValueError("MODEL_PATH must be within MODEL_ROOT.")
 
-        if not model_path.exists():
-            raise ValueError("MODEL_PATH does not exist.")
-
         model_version = env.get("MODEL_VERSION")
         if not model_version:
             raise ValueError("MODEL_VERSION is required.")
@@ -96,12 +93,8 @@ class Settings:
         )
         deterministic_mode = _parse_bool(env.get("DETERMINISTIC_MODE", "false"), "DETERMINISTIC_MODE")
 
-        max_active_games_raw = env.get("MAX_ACTIVE_GAMES")
-        max_active_games = (
-            _parse_int(max_active_games_raw, "MAX_ACTIVE_GAMES", min_value=1)
-            if max_active_games_raw
-            else None
-        )
+        max_active_games_raw = env.get("MAX_ACTIVE_GAMES", "100")
+        max_active_games = _parse_int(max_active_games_raw, "MAX_ACTIVE_GAMES", min_value=1)
 
         return cls(
             api_host=api_host,

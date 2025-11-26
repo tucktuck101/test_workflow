@@ -33,6 +33,10 @@ class Observability:
             description="Inference latency in ms",
             unit="ms",
         )
+        self.rate_limit_hits = self.meter.create_counter(
+            name="rate_limit_hits_total",
+            description="Rate limit rejections",
+        )
 
     @contextmanager
     def span(self, name: str, attributes: Optional[Dict] = None) -> Iterator[None]:

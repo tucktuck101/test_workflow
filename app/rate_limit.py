@@ -4,6 +4,12 @@ from typing import Dict
 from .errors import raise_http
 
 
+class RateLimitExceeded(Exception):
+    def __init__(self, retry_after: int) -> None:
+        super().__init__("rate_limited")
+        self.retry_after = retry_after
+
+
 class SimpleRateLimiter:
     """In-memory token bucket style rate limiter keyed by client identifier."""
 
@@ -22,5 +28,5 @@ class SimpleRateLimiter:
             self.capacity, self.tokens.get(key, self.capacity) + (now - last) * self.refill_rate
         )
         if self.tokens[key] < 1:
-            raise_http("rate_limited", {"retry_after": self.retry_after})
+            raise RateLimitExceeded(self.retry_after)
         self.tokens[key] -= 1

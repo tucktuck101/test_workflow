@@ -175,6 +175,7 @@ class InMemorySessionStore:
 
     def __init__(self, max_active_games: Optional[int] = None) -> None:
         self._sessions: Dict[str, GameSession] = {}
+        self._ended_ids: set[str] = set()
         self._max = max_active_games
 
     def create(self, board_size: int, deterministic_seed: Optional[int] = None) -> GameSession:
@@ -189,7 +190,11 @@ class InMemorySessionStore:
 
     def end(self, game_id: str) -> None:
         self._sessions.pop(game_id, None)
+        self._ended_ids.add(game_id)
 
     @property
     def active_count(self) -> int:
         return len(self._sessions)
+
+    def was_ended(self, game_id: str) -> bool:
+        return game_id in self._ended_ids

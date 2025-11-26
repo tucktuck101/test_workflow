@@ -25,9 +25,15 @@ Production-ready Battleship web app where users anonymously play against a pre-t
 
 ## Getting Started (pre-implementation)
 1) Install pre-commit: `pip install pre-commit` and run `pre-commit install`. Hooks cover trailing whitespace, EOF, YAML/JSON, secrets, codespell, black, ruff, and prettier.
-2) Review env defaults in `.env.example` and CONFIGURATION; adjust when backend exists. Keep model artifact under `MODEL_ROOT` with correct hash; stub artifact forthcoming.
+2) Review env defaults in `.env.example` and CONFIGURATION; adjust when backend exists. A stub artifact is provided at `models/stub_model.bin` with hash `9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e` and version `stub-v1` for dev/CI readiness.
 3) CI: `.github/workflows/ci.yml` runs pre-commit, quality gates via `ci/run_quality_gates.sh` (auto-detects Node/Python projects). Update scripts/tests as code lands. Coverage uses pytest-cov; mypy configured; load test stub in `load_tests/k6_load.js` (manual/nightly).
-4) Formatting/linting: see `.editorconfig`, `.prettierrc.json`, and `pyproject.toml` for formatter/linter settings (black/ruff/prettier).
+4) Backend formatting/linting: see `.editorconfig`, `.prettierrc.json`, and `pyproject.toml` for formatter/linter settings (black/ruff/prettier).
+5) Frontend: `cd frontend && npm install && npm run dev` (or `npm test` for vitest/RTL). Configure `VITE_API_BASE_URL` in `.env` if hitting a non-default backend.
+6) Makefile helpers: `make backend-coverage` (pytest with 90% gate), `make frontend-test` (vitest with thresholds), `make load-test` (k6 stub), `make setup` to bootstrap venv + npm deps. Devcontainer available in `.devcontainer/`.
+7) Containers: `docker compose up --build` builds backend/frontend with stub model; health checks wired to `/health/ready`. Frontend served on :3000 pointing to backend service.
+8) Training stub: `python -m training.trainer` (config via TRAIN_* envs) writes artifact + manifest to `./artifacts` by default; see tests/test_training.py for deterministic expectations.
+9) Artifact validation: `python -m tools.validate_artifact --artifact <file> --manifest <manifest.json> --root <MODEL_ROOT> --device <cpu|cuda>` for promotion checks. Promotion/rollback steps in `docs/RUNBOOKS.md`.
+10) CI helper: manual workflow `.github/workflows/artifact-validate.yml` runs the validation CLI; trigger via Actions → Artifact Validate with artifact/manifest/root/device inputs.
 
 ## Structure (see `CODE_MAP.md` for more)
 - `docs/`: Design/requirements/test/obs/security/deployment/planning/backlog

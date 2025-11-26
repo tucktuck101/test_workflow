@@ -9,14 +9,16 @@ ERROR_MAPPING = {
     "rate_limited": (status.HTTP_429_TOO_MANY_REQUESTS, "Rate limited"),
     "model_not_ready": (status.HTTP_503_SERVICE_UNAVAILABLE, "Model not ready"),
     "no_available_moves": (status.HTTP_400_BAD_REQUEST, "No available moves"),
+    "inference_failed": (status.HTTP_503_SERVICE_UNAVAILABLE, "Inference failed"),
 }
 
 
-def raise_http(error_code: str, details: dict | None = None) -> None:
+def raise_http(error_code: str, details: dict | None = None, headers: dict | None = None) -> None:
     status_code, message = ERROR_MAPPING.get(
         error_code, (status.HTTP_400_BAD_REQUEST, "Invalid request")
     )
     raise HTTPException(
         status_code=status_code,
         detail={"error_code": error_code, "message": message, "details": details},
+        headers=headers,
     )

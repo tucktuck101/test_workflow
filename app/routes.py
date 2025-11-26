@@ -1,3 +1,4 @@
+import time
 from typing import List
 
 from fastapi import APIRouter, FastAPI, Request
@@ -8,7 +9,7 @@ from .errors import raise_http
 from .health import readiness_payload
 from .model_loader import ModelLoader
 from .obs import Observability
-from .rate_limit import SimpleRateLimiter
+from .rate_limit import RateLimitExceeded, SimpleRateLimiter
 from .schemas import (
     AgentMove,
     ErrorResponse,
@@ -47,8 +48,9 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         client_id = request.client.host if request.client else "anonymous"
         try:
             rate_limiter.allow(client_id)
-        except Exception as exc:
-            raise_http("rate_limited", {"retry_after": 5})
+        except RateLimitExceeded as exc:
+            obs.rate_limit_hits.add(1)
+            raise_http("rate_limited", {"retry_after": exc.retry_after}, headers={"Retry-After": str(exc.retry_after)})
         if not loader.ready:
             raise_http("model_not_ready")
         with obs.span("game.start"):
@@ -89,8 +91,9 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         client_id = request.client.host if request.client else "anonymous"
         try:
             rate_limiter.allow(client_id)
-        except Exception:
-            raise_http("rate_limited", {"retry_after": 5})
+        except RateLimitExceeded as exc:
+            obs.rate_limit_hits.add(1)
+            raise_http("rate_limited", {"retry_after": exc.retry_after}, headers={"Retry-After": str(exc.retry_after)})
 
         if not loader.ready:
             raise_http("model_not_ready")
@@ -106,10 +109,13 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
             # Agent move (stub/deterministic)
             try:
                 loader.assert_ready()
+                infer_start = time.perf_counter()
                 agent_coord = agent_adapter.next_move(session)
                 agent_result = engine.apply_agent_move(session, agent_coord)
-            except Exception:
-                raise_http("model_not_ready")
+                obs.inference_latency.record((time.perf_counter() - infer_start) * 1000)
+            except Exception as exc:
+                session.status = engine.GameStatus.ABORTED
+                raise_http("inference_failed", {"reason": str(exc)})
 
         response = MoveResponse(
             player_result=MoveResult(
@@ -135,11 +141,12 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
     def quit_game(game_id: str, request: Request) -> QuitResponse:
         session = session_store.get(game_id)
         if session is None:
+            if session_store.was_ended(game_id):
+                return QuitResponse(status="ended")
             raise_http("game_not_found")
         assert session is not None
-        if session.is_finished():
-            raise_http("game_finished")
-        engine.quit_game(session)
+        if not session.is_finished():
+            engine.quit_game(session)
         session_store.end(game_id)
         return QuitResponse(status="ended")
 

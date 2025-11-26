@@ -19,7 +19,7 @@ jobs:
   quality-gates:
     runs-on: ubuntu-latest
     env:
-      COVERAGE_THRESHOLD: 85 # adjust per Quality Gates Matrix risk/tier selection
+      COVERAGE_THRESHOLD: 90 # per Quality Gates Matrix for backend; frontend thresholds set in vitest config
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,3 +41,12 @@ jobs:
           fetch-depth: 0
       - name: Gitleaks secrets scan
         uses: gitleaks/gitleaks-action@v2
+      - name: Python dependency audit
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit -r requirements.txt
+      - name: NPM audit (frontend)
+        working-directory: frontend
+        run: |
+          npm install --ignore-scripts
+          npm audit --audit-level=moderate

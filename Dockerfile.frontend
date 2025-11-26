@@ -1,6 +1,10 @@
-# Placeholder frontend Dockerfile; to be updated when frontend scaffold lands.
-FROM node:20-alpine
+FROM node:20-alpine AS build
 WORKDIR /app
-COPY package*.json /app/
-RUN npm install || true
-CMD ["npm", "run", "dev", "--", "--host", "--port", "5173"]
+COPY frontend/package.json frontend/package-lock.json* frontend/tsconfig.json frontend/vite.config.ts ./
+COPY frontend/src ./src
+RUN npm install && npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

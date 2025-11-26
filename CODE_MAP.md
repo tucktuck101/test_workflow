@@ -10,6 +10,7 @@
 - `.github/`: Issue/PR templates, CI workflow.
 - `ci/`: quality gates script.
 - `.env.example`, `CONFIGURATION.md`: environment/config guidance.
+- `models/stub_model.bin`: lightweight stub artifact for dev/CI (hash `9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e`, version `stub-v1`).
 - `init_codex_project.sh`, `reset_codex_init.sh`: bootstrap helpers.
 - `.editorconfig`, `.prettierrc.json`, `.pre-commit-config.yaml`, `pyproject.toml`: formatting/linting config for Python/JS and pre-commit.
 
@@ -31,11 +32,32 @@
   - `test_health.py`: health/readiness tests.
   - `test_rate_limit.py`: rate-limit guard tests.
   - `test_agent.py`: deterministic agent tests.
+  - `test_routes.py`: gameplay API happy/error/capacity/idempotent and inference-failure cases.
+  - `test_main.py`: CORS middleware behavior and preflight checks.
 - `requirements.txt`: Python dependencies (fastapi, uvicorn, pytest, mypy, otel).
+- `Makefile`: common tasks (backend coverage/typecheck, frontend tests, load test stub).
+- `frontend/`: React/Vite SPA for gameplay loop.
+  - `src/App.tsx`: UI for start/move/quit, boards, readiness badge, error/backoff messaging.
+  - `src/api.ts`: client wrapper, error mapping, config handling for `VITE_API_BASE_URL`.
+  - `src/styles.css`: design tokens/layout.
+  - `src/types.ts`: shared frontend types.
+  - `src/App.test.tsx`, `src/api.test.ts`: RTL/vitest coverage for flows and error mapping.
+  - `vite.config.ts`, `vitest.config.ts`, `tsconfig.json`, `package.json`, `package-lock.json`.
 - `docker-compose.yml`: local backend/frontend composition; healthcheck wiring.
 - `Dockerfile.backend`: backend container (FastAPI).
-- `Dockerfile.frontend`: placeholder frontend container (update when scaffolded).
+- `Dockerfile.frontend`: builds Vite frontend into nginx.
 - `load_tests/k6_load.js`: k6 load test stub for start/move endpoints.
+- `load_tests/README.md`: how/when to run k6 load stub and target baselines.
+- `pytest.ini`: test warning filters.
+- `.devcontainer/`: VS Code devcontainer for Python 3.11 + Node 20 setup.
+- `training/`: stub training pipeline.
+  - `config.py`: training config/env parsing.
+  - `trainer.py`: deterministic stub training that emits artifact + manifest (hash/version/device).
+  - `tests/test_training.py`: verifies deterministic artifact and manifest/hash and validate tool.
+  - `tools/validate_artifact.py`: CLI to validate artifact vs manifest/hash/root/device for promotion checks.
+- `.github/workflows/artifact-validate.yml`: manual workflow to run artifact validation CLI for promotions.
+- `app/rate_limit.py`: token bucket limiter with RateLimitExceeded.
+- `tests/test_rate_limit.py`: ensures 429 with Retry-After and non-limited path.
 
 ## Planned Additions
 - Frontend: React/Vite app, components, API client, tests.

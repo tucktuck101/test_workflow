@@ -4,10 +4,11 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app /app/app
+COPY models /app/models
 EXPOSE 8000
-ENV MODEL_PATH=/app/model.bin \
-    MODEL_VERSION=v0.0.1 \
-    MODEL_HASH=stub \
+ENV MODEL_PATH=/app/models/stub_model.bin \
+    MODEL_VERSION=stub-v1 \
+    MODEL_HASH=9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e \
     MODEL_DEVICE=cpu \
     BOARD_SIZE=10 \
     LOG_LEVEL=info \

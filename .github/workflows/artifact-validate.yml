@@ -1,0 +1,36 @@
+name: Artifact Validate
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: Path to artifact file (relative to repo or absolute)
+        required: true
+      manifest:
+        description: Path to manifest.json (relative to repo or absolute)
+        required: true
+      root:
+        description: Allowed root directory
+        required: true
+      device:
+        description: Expected device (cpu|cuda)
+        required: true
+        default: cpu
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Validate artifact
+        run: |
+          python -m tools.validate_artifact --artifact "${{ github.event.inputs.artifact }}" --manifest "${{ github.event.inputs.manifest }}" --root "${{ github.event.inputs.root }}" --device "${{ github.event.inputs.device }}"

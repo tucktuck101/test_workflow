@@ -5,9 +5,9 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     environment:
-      - MODEL_PATH=/app/model.bin
-      - MODEL_VERSION=v0.0.1
-      - MODEL_HASH=stub
+      - MODEL_PATH=/app/models/stub_model.bin
+      - MODEL_VERSION=stub-v1
+      - MODEL_HASH=9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e
       - MODEL_DEVICE=cpu
       - BOARD_SIZE=10
       - LOG_LEVEL=info
@@ -24,5 +24,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    environment:
+      - VITE_API_BASE_URL=http://backend:8000
     ports:
       - "3000:80"
