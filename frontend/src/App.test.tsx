@@ -63,7 +63,7 @@ describe('App', () => {
     fireEvent.click(startBtn);
     await screen.findByText(/Game started/);
 
-    const cells = screen.getAllByRole('button', { name: /Your Board cell/ });
+    const cells = screen.getAllByRole('button', { name: /Agent Board.*cell/ });
     fireEvent.click(cells[0]);
 
     await waitFor(() => expect(screen.getByText(/Agent fired/)).toBeInTheDocument());

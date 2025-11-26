@@ -193,8 +193,13 @@ function App() {
       </div>
 
       <div className="board-wrap" aria-live="polite">
-        <Board grid={board} label="Your Board" disabled={moveDisabled} onCellClick={handleMove} />
-        <Board grid={agentBoard} label="Agent Board (masked)" disabled onCellClick={undefined} />
+        <Board grid={board} label="Your Board (incoming shots)" disabled onCellClick={undefined} />
+        <Board
+          grid={agentBoard}
+          label="Agent Board (click to fire)"
+          disabled={moveDisabled}
+          onCellClick={handleMove}
+        />
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
