@@ -24,9 +24,10 @@ Production-ready Battleship web app where users anonymously play against a pre-t
 - Critic Pass before merge; red-flag human review for auth/data schema/public API/security-sensitive paths.
 
 ## Getting Started (pre-implementation)
-1) Install pre-commit: `pip install pre-commit` and run `pre-commit install`.
+1) Install pre-commit: `pip install pre-commit` and run `pre-commit install`. Hooks cover trailing whitespace, EOF, YAML/JSON, secrets, codespell, black, ruff, and prettier.
 2) Review env defaults in `.env.example` and CONFIGURATION; adjust when backend exists.
-3) CI: `.github/workflows/ci.yml` runs pre-commit, quality gates via `ci/run_quality_gates.sh`. Update scripts/tests as code lands.
+3) CI: `.github/workflows/ci.yml` runs pre-commit, quality gates via `ci/run_quality_gates.sh` (auto-detects Node/Python projects). Update scripts/tests as code lands.
+4) Formatting/linting: see `.editorconfig`, `.prettierrc.json`, and `pyproject.toml` for formatter/linter settings (black/ruff/prettier).
 
 ## Structure (see `CODE_MAP.md` for more)
 - `docs/`: Design/requirements/test/obs/security/deployment/planning/backlog

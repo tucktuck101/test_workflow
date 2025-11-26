@@ -739,13 +739,13 @@ Codex may recommend or perform auto-merge of a PR only if all of:
        - Inconsistencies with ADRs or requirements.
    - The Critic Pass must produce a brief checklist-style note in the PR or linked Issue, e.g.:
 
-     - [ ] Behavioural changes identified and match requirements  
-     - [ ] Negative/edge cases covered  
-     - [ ] Security-sensitive code reviewed  
-     - [ ] Observability hooks updated (where needed)  
-     - [ ] No suspicious shortcuts in tests  
-     - [ ] Performance implications considered (if relevant)  
-     - [ ] Rollback/revert strategy considered (if this changes data/external state)
+    - [ ] Behavioural changes identified and match requirements
+    - [ ] Negative/edge cases covered
+    - [ ] Security-sensitive code reviewed
+    - [ ] Observability hooks updated (where needed)
+    - [ ] No suspicious shortcuts in tests
+    - [ ] Performance implications considered (if relevant)
+    - [ ] Rollback/revert strategy considered (if this changes data/external state)
 
    - If the Critic Pass finds issues, Codex must:
      - Mark them explicitly and address them.
@@ -914,19 +914,19 @@ Mandatory sections:
   3. **Architectural Integrity Check**
 
 - **Standard tier Epics:**
-  1. Completion Summary  
-  2. Features and Tasks Traceability  
-  3. Architectural Integrity Check  
-  4. Security & Compliance Summary  
-  5. Observability & Reliability Health Check  
-  6. Testing & Coverage Summary  
-  7. CI/CD Status  
+  1. Completion Summary
+  2. Features and Tasks Traceability
+  3. Architectural Integrity Check
+  4. Security & Compliance Summary
+  5. Observability & Reliability Health Check
+  6. Testing & Coverage Summary
+  7. CI/CD Status
 
-- **Enterprise tier Epics:**
-  - All of the above plus:
-  8. Deployment Readiness  
-  9. Risks, Limitations, and Follow-Ups  
-  10. ADR Index for this Epic  
+  - **Enterprise tier Epics:**
+    - All of the above plus:
+  8. Deployment Readiness
+  9. Risks, Limitations, and Follow-Ups
+  10. ADR Index for this Epic
 
 Content model:
 
