@@ -1,7 +1,8 @@
 name: 'Architecture Decision Record (ADR)'
 description: Track an ADR Issue linked 1:1 to an ADR file and impacted work items.
 title: 'ADR-: '
-labels: []
+labels:
+  - ADR
 body:
   - type: markdown
     attributes:
