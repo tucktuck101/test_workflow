@@ -6,6 +6,7 @@ from . import agent, engine
 from .config import Settings
 from .errors import raise_http
 from .health import readiness_payload
+from .model_loader import ModelLoader
 from .rate_limit import SimpleRateLimiter
 from .schemas import (
     AgentMove,
@@ -29,7 +30,7 @@ def _render_hits(board_size: int, hits: dict) -> List[List[str]]:
     return board
 
 
-def get_router(app: FastAPI, settings: Settings) -> APIRouter:
+def get_router(app: FastAPI, settings: Settings, loader: ModelLoader) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["gameplay"])
     session_store = engine.InMemorySessionStore(settings.max_active_games)
     agent_adapter = agent.AgentAdapter(deterministic=settings.deterministic_mode)
@@ -47,6 +48,8 @@ def get_router(app: FastAPI, settings: Settings) -> APIRouter:
             rate_limiter.allow(client_id)
         except Exception as exc:
             raise_http("rate_limited", {"retry_after": 5})
+        if not loader.ready:
+            raise_http("model_not_ready")
         try:
             session = session_store.create(
                 board_size=settings.board_size, deterministic_seed=settings.deterministic_mode and 0 or None
@@ -87,6 +90,8 @@ def get_router(app: FastAPI, settings: Settings) -> APIRouter:
         except Exception:
             raise_http("rate_limited", {"retry_after": 5})
 
+        if not loader.ready:
+            raise_http("model_not_ready")
         try:
             player_result = engine.apply_player_move(session, (payload.x, payload.y))
         except engine.InvalidMove as exc:
@@ -96,9 +101,10 @@ def get_router(app: FastAPI, settings: Settings) -> APIRouter:
 
         # Agent move (stub/deterministic)
         try:
+            loader.assert_ready()
             agent_coord = agent_adapter.next_move(session)
             agent_result = engine.apply_agent_move(session, agent_coord)
-        except engine.InvalidMove:
+        except Exception:
             raise_http("model_not_ready")
         except engine.GameFinished:
             pass
@@ -137,7 +143,7 @@ def get_router(app: FastAPI, settings: Settings) -> APIRouter:
     return router
 
 
-def get_health_router(settings: Settings) -> APIRouter:
+def get_health_router(settings: Settings, loader: ModelLoader) -> APIRouter:
     router = APIRouter(tags=["health"])
 
     @router.get("/health/live")
@@ -149,6 +155,8 @@ def get_health_router(settings: Settings) -> APIRouter:
         responses={503: {"model": ErrorResponse}},
     )
     def ready():
+        if not loader.ready:
+            raise_http("model_not_ready", {"reason": loader.error})
         return readiness_payload(settings)
 
     return router
