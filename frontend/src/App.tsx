@@ -52,6 +52,9 @@ const statusCopy: Record<GameStatus | 'ready', string> = {
   aborted: 'Aborted',
 };
 
+const isReady = (val: ReadyResponse | { status: 'checking' | 'error'; reason?: string }): val is ReadyResponse =>
+  val.status === 'ready';
+
 function App() {
   const [board, setBoard] = useState<CellState[][]>(emptyBoard(10));
   const [agentBoard, setAgentBoard] = useState<CellState[][]>(emptyBoard(10));
@@ -79,7 +82,8 @@ function App() {
   const readyBadge = useMemo(() => {
     if (readiness.status === 'checking') return { tone: 'loading', text: 'Checking readiness…' };
     if (readiness.status === 'error') return { tone: 'error', text: readiness.reason || 'Not ready' };
-    return { tone: 'ready', text: `Ready · ${readiness.model_version}` };
+    if (isReady(readiness)) return { tone: 'ready', text: `Ready · ${readiness.model_version}` };
+    return { tone: 'error', text: 'Not ready' };
   }, [readiness]);
 
   async function handleStart() {
