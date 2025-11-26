@@ -19,10 +19,10 @@ workflows:
         category: dependency
 
 triage_labels:
-  needed: "triage: needed"
-  feature_needed: "triage: feature-needed"
-  source_ci: "source: ci"
-  type_bug: "Bug"
+  needed: 'triage: needed'
+  feature_needed: 'triage: feature-needed'
+  source_ci: 'source: ci'
+  type_bug: 'Bug'
 
 dedupe:
   window_runs: 50
@@ -34,4 +34,4 @@ ignore:
   error_patterns: []
 
 ownership:
-  owners: []  # optional: [{feature: FEAT-CI-QUALITY, assignees: ["owner1"]}]
+  owners: [] # optional: [{feature: FEAT-CI-QUALITY, assignees: ["owner1"]}]

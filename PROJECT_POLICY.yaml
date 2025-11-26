@@ -2,7 +2,7 @@
 # Bootstrap skeleton only. All fields marked TO_BE_SET_BY_CODEX
 # must be filled during Codex Interview Mode.
 project_name: Coding_Agent_worklfow
-contract_version: v1.5
+contract_version: v1.6
 
 supervision_mode: async
 supervisor_response_window_hours: 168

@@ -1,6 +1,6 @@
-name: "User Story (US)"
+name: 'User Story (US)'
 description: Capture a user story (US-###) linked to a Functional Requirement.
-title: "US-: "
+title: 'US-: '
 labels: []
 body:
   - type: markdown

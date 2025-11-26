@@ -1,6 +1,6 @@
-name: "Business Requirement (BR)"
+name: 'Business Requirement (BR)'
 description: Capture a business outcome (BR-###) linked to an Epic and downstream requirements.
-title: "BR-: "
+title: 'BR-: '
 labels: []
 body:
   - type: markdown

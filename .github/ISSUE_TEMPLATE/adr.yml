@@ -1,0 +1,101 @@
+name: "Architecture Decision Record (ADR)"
+description: Track an ADR Issue linked 1:1 to an ADR file and impacted work items.
+title: "ADR-: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** This Issue tracks an ADR. Keep it in sync with the ADR markdown file (ADR-NNNN-kebab-case-title.md). Link all impacted work items (BR/FR/NFR/US/Epics/Features/Tasks/Bugs). Major decisions require supervisor approval per AGENT_CONTRACT. Proposal Branch PRs must link to the ADR Issue. If superseded/rejected, update status and link between ADRs.
+  - type: input
+    id: adr_id
+    attributes:
+      label: ADR ID
+      description: ADR-NNNN-kebab-case-title (e.g., ADR-0004-choose-database)
+      placeholder: ADR-0000-example
+    validations:
+      required: true
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options:
+        - proposed
+        - accepted
+        - rejected
+        - superseded
+        - deprecated
+    validations:
+      required: true
+  - type: dropdown
+    id: decision_type
+    attributes:
+      label: Decision Type
+      options:
+        - architecture
+        - tech stack
+        - data
+        - security
+        - operations
+        - process/policy
+        - cost-incurring
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Background, problem, forces.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision
+      description: Chosen option.
+    validations:
+      required: true
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: Positive, negative, trade-offs.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Options rejected and why.
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope_impact
+    attributes:
+      label: Scope / Impact
+      options:
+        - label: business requirements (BR)
+        - label: functional requirements (FR)
+        - label: non-functional requirements (NFR)
+        - label: user stories
+        - label: epics
+        - label: features
+        - label: tasks
+        - label: bugs
+        - label: repo-wide policy/infra/config
+  - type: textarea
+    id: impact_summary
+    attributes:
+      label: Impact Summary
+      description: Concrete impact description.
+  - type: textarea
+    id: linked_items
+    attributes:
+      label: Linked Items
+      description: BR/FR/NFR/US/Epics/Features/Tasks/Bugs IDs; ADR file path (e.g., adr/ADR-0000-title.md).
+  - type: textarea
+    id: implementation_plan
+    attributes:
+      label: Implementation Plan / Follow-up Work
+      description: Epics/Features/Tasks needed to apply this decision.

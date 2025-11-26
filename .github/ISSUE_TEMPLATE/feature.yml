@@ -1,7 +1,7 @@
-name: "Feature"
+name: 'Feature'
 description: Define a Feature linked to an Epic and requirements; derive Tasks from it.
-title: "FEAT-: "
-labels: ["Feature"]
+title: 'FEAT-: '
+labels: ['Feature']
 body:
   - type: markdown
     attributes:

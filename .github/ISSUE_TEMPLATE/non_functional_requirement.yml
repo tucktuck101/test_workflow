@@ -1,6 +1,6 @@
-name: "Non-Functional Requirement (NFR)"
+name: 'Non-Functional Requirement (NFR)'
 description: Capture a non-functional requirement (NFR-###) linked to a Business Requirement.
-title: "NFR-: "
+title: 'NFR-: '
 labels: []
 body:
   - type: markdown

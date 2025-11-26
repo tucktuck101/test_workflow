@@ -1,7 +1,7 @@
-name: "Task"
+name: 'Task'
 description: Smallest unit of planned work tied to a Feature (and optional Bug).
-title: "TASK-: "
-labels: ["Task"]
+title: 'TASK-: '
+labels: ['Task']
 body:
   - type: markdown
     attributes:

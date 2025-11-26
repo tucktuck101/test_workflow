@@ -1,7 +1,7 @@
-name: "Epic"
+name: 'Epic'
 description: Plan an Epic linked to BRs/FRs/USs and composed of Features.
-title: "EPIC-: "
-labels: ["Epic"]
+title: 'EPIC-: '
+labels: ['Epic']
 body:
   - type: markdown
     attributes:

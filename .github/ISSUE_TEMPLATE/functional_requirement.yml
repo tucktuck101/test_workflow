@@ -1,6 +1,6 @@
-name: "Functional Requirement (FR)"
+name: 'Functional Requirement (FR)'
 description: Capture a functional requirement (FR-###) linked to a Business Requirement.
-title: "FR-: "
+title: 'FR-: '
 labels: []
 body:
   - type: markdown

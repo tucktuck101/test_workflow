@@ -1,7 +1,7 @@
-name: "Bug"
+name: 'Bug'
 description: Log a defect tied to a Parent Feature; fixes must go through Tasks.
-title: "BUG-: "
-labels: ["Bug"]
+title: 'BUG-: '
+labels: ['Bug']
 body:
   - type: markdown
     attributes:
