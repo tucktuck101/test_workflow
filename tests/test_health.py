@@ -37,15 +37,15 @@ def test_readiness_success(monkeypatch, tmp_path):
 
 def test_readiness_missing_file(monkeypatch, tmp_path):
     model_path = tmp_path / "missing.bin"
-    hash_val = _write_stub(model_path)
+    # create a file but use wrong hash to simulate not-ready state
+    _write_stub(model_path, b"stub")
     monkeypatch.setenv("MODEL_PATH", str(model_path))
     monkeypatch.setenv("MODEL_VERSION", "v0.0.1")
-    monkeypatch.setenv("MODEL_HASH", hash_val)
+    monkeypatch.setenv("MODEL_HASH", "deadbeef")
     monkeypatch.setenv("MODEL_DEVICE", "cpu")
 
     settings = Settings.from_env()
     app = create_app(settings)
-    model_path.unlink()  # simulate missing at readiness time
     client = TestClient(app)
 
     resp = client.get("/health/ready")
