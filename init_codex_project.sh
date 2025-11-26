@@ -775,12 +775,12 @@ Codex may recommend or perform auto-merge of a PR only if all of:
        - Inconsistencies with ADRs or requirements.
    - The Critic Pass must produce a brief checklist-style note in the PR or linked Issue, e.g.:
 
-     - [ ] Behavioural changes identified and match requirements  
-     - [ ] Negative/edge cases covered  
-     - [ ] Security-sensitive code reviewed  
-     - [ ] Observability hooks updated (where needed)  
-     - [ ] No suspicious shortcuts in tests  
-     - [ ] Performance implications considered (if relevant)  
+     - [ ] Behavioural changes identified and match requirements
+     - [ ] Negative/edge cases covered
+     - [ ] Security-sensitive code reviewed
+     - [ ] Observability hooks updated (where needed)
+     - [ ] No suspicious shortcuts in tests
+     - [ ] Performance implications considered (if relevant)
      - [ ] Rollback/revert strategy considered (if this changes data/external state)
 
    - If the Critic Pass finds issues, Codex must:
