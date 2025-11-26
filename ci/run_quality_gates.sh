@@ -38,8 +38,10 @@ run_node() {
 }
 
 run_python() {
-  if [[ -f pyproject.toml || -f requirements.txt || -f requirements-dev.txt ]]; then
-    info "Python project detected."
+  local py_files
+  py_files=$(git ls-files '*.py' | wc -l | tr -d ' ')
+  if [[ ( -f pyproject.toml || -f requirements.txt || -f requirements-dev.txt ) && "${py_files}" -gt 0 ]]; then
+    info "Python project detected (${py_files} Python files)."
     python -m pip install --upgrade pip
     if [[ -f requirements.txt ]]; then
       python -m pip install -r requirements.txt
@@ -61,6 +63,8 @@ run_python() {
     else
       warn "pytest not installed; skipping tests/coverage."
     fi
+  else
+    info "No Python sources detected; skipping Python checks."
   fi
 }
 

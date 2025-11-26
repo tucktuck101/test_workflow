@@ -11,6 +11,7 @@
 - `ci/`: quality gates script.
 - `.env.example`, `CONFIGURATION.md`: environment/config guidance.
 - `init_codex_project.sh`, `reset_codex_init.sh`: bootstrap helpers.
+- `.editorconfig`, `.prettierrc.json`, `.pre-commit-config.yaml`, `pyproject.toml`: formatting/linting config for Python/JS and pre-commit.
 
 ## Planned Code Structure (pending implementation)
 - `backend/` (planned): FastAPI app, game engine, session store, agent adapter, tests.
