@@ -1,0 +1,63 @@
+name: 'Non-Functional Requirement (NFR)'
+description: Capture a non-functional requirement (NFR-###) linked to a Business Requirement.
+title: 'NFR-: '
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** NFRs constrain Features/Tasks. If implementation conflicts with an NFR, create/update Tasks to address it before proceeding.
+  - type: input
+    id: reference_id
+    attributes:
+      label: Reference ID
+      description: Format NFR-### (e.g., NFR-001)
+      placeholder: NFR-001
+    validations:
+      required: true
+  - type: input
+    id: parent_br
+    attributes:
+      label: Parent Business Requirement (BR-###)
+      placeholder: BR-001
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - performance
+        - security
+        - observability
+        - reliability
+        - availability
+        - scalability
+        - maintainability
+        - usability
+        - compliance
+        - other
+    validations:
+      required: true
+  - type: input
+    id: requirement_statement
+    attributes:
+      label: Requirement Statement
+      description: Measurable statement.
+    validations:
+      required: true
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Metrics / Thresholds
+      description: Targets or thresholds.
+  - type: textarea
+    id: scope_components
+    attributes:
+      label: Scope / Components Affected
+      description: Systems/services impacted.
+  - type: textarea
+    id: linked_frs_features
+    attributes:
+      label: Linked FRs / Features
+      description: Refer to FRs/Features constrained by this NFR.

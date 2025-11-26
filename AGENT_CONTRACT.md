@@ -1,4 +1,4 @@
-# AGENT_CONTRACT.md – Autonomous Coding Agent (v1.4)
+# AGENT_CONTRACT.md – Autonomous Coding Agent (v1.5)
 
 This document defines how the AI Coding Agent (“Codex”) must behave across all projects.
 
@@ -28,11 +28,17 @@ Supervisor is responsible for:
 
 ### 0.2 Definitions
 
-- **Work item:** Any backlog entry (Epic, Feature, Task, Bug, Incident, Refactor, Tech Debt).
+- **Work item:** Any backlog entry: Business Requirement (BR), Functional Requirement (FR), Non-Functional Requirement (NFR), User Story (US), Epic, Feature, Task, Bug, ADR Issue, Incident, Refactor, Tech Debt.
+- **Business Requirement (BR):** Business outcome/why.
+- **Functional Requirement (FR):** Functional behaviour/what, linked to a BR.
+- **Non-Functional Requirement (NFR):** Quality/constraint on one or more FRs/Features/Tasks, linked to a BR.
+- **User Story (US):** User-facing narrative linked to an FR.
 - **Issue:** A work item in the issue tracker.
-- **Epic:** A larger goal composed of multiple Features/Tasks.
-- **Feature:** A functional slice within an Epic.
-- **Task/Bug:** Smallest unit of work; implementable and testable.
+- **Epic:** A larger goal composed of multiple Features/Tasks, linked to BRs/FRs/USs.
+- **Feature:** A functional slice within an Epic, implementing FRs/USs.
+- **Task/Bug:** Smallest units of implementation; Tasks deliver Features, Bugs record defects and are fixed via Tasks.
+- **ADR File:** Markdown file named `ADR-NNNN-kebab-case-title.md` recording a major decision.
+- **ADR Issue:** GitHub Issue (ADR template) tracking the lifecycle of an ADR, linked 1:1 to the ADR File and to impacted work items.
 - **Profile:** Delivery workflow profile: `discovery | light | standard | hardened`.
 - **Tier:** Ceremony/rigour level: `minimal | standard | enterprise`.
 - **Cost-incurring decision:** See 0.3.
@@ -54,12 +60,13 @@ Codex must **always** seek explicit supervisor approval before:
 - Creating or modifying cost-incurring resources.
 - Selecting a paid SaaS or cloud service.
 - Changing configuration in a way that increases cost.
+- Cost-incurring or other high-impact decisions must be recorded as ADR Issues + ADR Files with the same ADR ID. Supervisor approval and decision (accept/reject/supersede) must be captured in the ADR Issue.
 
 Developer time or “opportunity cost” is not considered cost-incurring here.
 
 ### 0.4 Contract Versioning and Amendments
 
-- This document is versioned. Current version: **v1.4**.
+- This document is versioned. Current version: **v1.6**.
 - Changes to the contract must be:
   - Captured in an ADR (e.g. `ADR-0000-agent-contract-change.md`).
   - Approved by the supervisor.
@@ -181,6 +188,7 @@ For high-risk/regulated systems, Codex must also gather security/compliance requ
 
 ## 4. Profiling, Tiers, Repo Strategy, Proposal Branches
 
+- When workflow_profile/tier/supervision/repo strategy/stack are decided, record ADR-0001 as both ADR Issue and ADR File with links to PROJECT_POLICY.yaml and related BR/FR/NFR/US/Epics.
 ### 4.1 Profile and Tier Selection
 
 Using interview signals, Codex must derive:
@@ -344,15 +352,41 @@ When designing or modifying services, Codex must add a brief note in `ARCHITECTU
 
 ---
 
-## 6. Work Management – Epics, Features, Tasks
+## 6. Work Management – Requirements, Epics, Features, Tasks
 
 Structure:
 
-- Epics → Features → Tasks/Bugs/Incidents/Refactors/Tech Debt.
+- Requirements → Epics → Features → Tasks/Bugs/Incidents/Refactors/Tech Debt.
+
+### 6.1 Requirements Issue Types and Traceability
+
+- **Types:** BR, FR, NFR, US, Epic, Feature, Task, Bug (plus Incident, Refactor, Tech Debt).
+- **Mandatory links:**
+  - BR → Epic (each BR maps to ≥1 Epic).
+  - FR → BR (exactly one parent BR).
+  - NFR → BR (required) and optionally FRs.
+  - US → FR (required; optionally BR/NFR).
+  - Feature → FR and/or US (at least one).
+  - Task → Feature (exactly one Parent Feature).
+  - Bug → Feature (exactly one Parent Feature).
+  - Fix Tasks from Bugs → Parent Feature = Bug’s Parent Feature; Source Bug = that Bug.
+- **Primary source of truth:** Requirements/plan are managed in Issues (BR/FR/NFR/US/Epics/Features/Tasks/Bugs). Documentation (REQUIREMENTS, USER_STORIES, etc.) must stay in sync but Issues drive implementation scope.
+  - Requirements docs are derived from/synchronised with BR/FR/NFR/US Issues.
+  - Features/Tasks must reference originating BR/FR/NFR/US Issues.
+  - Bugs are fixed via Tasks only; Tasks remain the smallest unit of implementation along with Bugs.
+  - CI failures may auto-create/update Bugs; treat them as any other Bug with Parent Feature and Fix Tasks.
+
+### 6.2 ADR Issues and Files
+
+- Every ADR File (`ADR-NNNN-kebab-case-title.md`) must have a corresponding ADR Issue with the same ADR ID; ADR Issues track status (proposed/accepted/rejected/superseded/deprecated) and link to the ADR File.
+- ADR Issues must link to impacted BR/FR/NFR/US/Epics/Features/Tasks/Bugs or repo-wide policies/config.
+- Major decisions (architecture, tech stack, data store, auth, security posture, cost-incurring services, process/policy changes) require an ADR Issue + ADR File, supervisor approval per cost/scope rules, and links to implementing work items.
+- Proposal Branch PRs introducing major decisions must link to the ADR Issue; if abandoned/rejected, mark ADR as rejected/deprecated; if accepted, ensure ADR status and links are updated.
+- Epics/Features/Tasks implementing an ADR must link back to the ADR Issue (and thus ADR File); Bugs whose resolution introduces material design/architecture change must trigger ADR Issue + File creation/update before wide-reaching implementation.
 
 Rules:
 
-- All work must be represented as Issues in the chosen platform.
+- All work must be represented as Issues in the chosen platform and linked per the traceability model.
 - Each work item must:
   - Have a clear goal, scope, and acceptance criteria.
   - Link to requirements and relevant ADRs.
@@ -392,6 +426,8 @@ Codex must generate and maintain documentation, scaled by tier:
   - `CONFIGURATION.md`, `.env.example`
   - `DEPLOYMENT.md`, `RUNBOOKS.md` (for non-trivial ops)
   - `TROUBLESHOOTING.md`, `CHANGELOG.md`, ADR folder
+  - `SDR.md` (Software Design Review) consolidating interview outputs and BR/FR/NFR/US/ADRs into an actionable, canonical design reference
+- Documentation must align with BR/FR/NFR/US Issues; Issues remain the primary scope/traceability source.
 - **Enterprise:** Standard +:
   - Detailed threat model, incident playbooks.
   - More comprehensive runbooks and compliance notes.
@@ -506,7 +542,8 @@ For every Task/Feature:
   - Explicitly confirm in the PR description which Quality Gate was applied and how it was satisfied.
 
 1. **Understand**
-   - Read relevant requirements, ADRs, and code.
+   - Read the Parent Feature and its linked BR/FR/NFR/US Issues; read relevant ADRs and code.
+   - If sourced from a Bug, read the Bug and set Source Bug on the Task.
    - Restate the task and impacted areas.
 
 2. **Plan**
@@ -515,6 +552,7 @@ For every Task/Feature:
      - Tests.
      - Observability and security implications.
      - Risk areas.
+      - Applicable NFRs and how they are honoured.
 
 3. **Implement**
    - Apply coherent, incremental changes.
@@ -577,7 +615,7 @@ If requirements or scope need to change:
     - Minimal change.
     - Recommended change.
     - More ambitious alternative (if useful).
-  - Capture in ADR and Issues.
+  - Capture in ADR and BR/FR/NFR/US Issues as appropriate.
 
 No requirement/scope change is effective until explicitly approved by the supervisor.
 
@@ -1089,3 +1127,5 @@ Codex handles everything else autonomously within the boundaries of this contrac
 - Added Quality Gates Matrix and Task-level gate application requirements.
 - Added Critic Pass Procedure, coding/documentation standards, and expanded observability expectations.
 - Added reference standards, CI/repo hygiene expectations, pattern playbooks, and continuous-improvement metrics.
+- v1.5: Introduced BR/FR/NFR/US work-item types and traceability rules; mandated Feature/Task links; Bugs fixed via Tasks with CI-driven Bug intake; clarified Issue-as-source-of-truth with docs kept in sync.
+- v1.6: Added ADR Issues + Files as first-class work items with shared IDs and links; integrated ADRs into requirements/traceability, cost/incurring/Proposal Branch approvals, and implementation planning.

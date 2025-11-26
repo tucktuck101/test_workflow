@@ -1,0 +1,75 @@
+name: 'Feature'
+description: Define a Feature linked to an Epic and requirements; derive Tasks from it.
+title: 'FEAT-: '
+labels: ['Feature']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** Feature is the primary source for Tasks. Ensure traceability to Epic and requirements; do not deliver entire feature in one Task.
+  - type: input
+    id: reference_id
+    attributes:
+      label: Reference ID
+      description: Format FEAT-### (e.g., FEAT-001)
+      placeholder: FEAT-001
+    validations:
+      required: true
+  - type: input
+    id: parent_epic
+    attributes:
+      label: Parent Epic (EPIC-###)
+      placeholder: EPIC-001
+    validations:
+      required: true
+  - type: textarea
+    id: linked_requirements
+    attributes:
+      label: Linked FRs / User Stories (required)
+      description: List FR/US IDs this Feature implements.
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What this Feature delivers.
+    validations:
+      required: true
+  - type: textarea
+    id: problem_context
+    attributes:
+      label: Problem / Context
+  - type: textarea
+    id: user_system_story
+    attributes:
+      label: User / System Story
+  - type: textarea
+    id: functional_requirements
+    attributes:
+      label: Functional Requirements (summary + references)
+  - type: textarea
+    id: non_functional_requirements
+    attributes:
+      label: Non-Functional Requirements (constraints)
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope (In / Out)
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies & Links
+  - type: textarea
+    id: success_metrics
+    attributes:
+      label: Success Metrics / SLIs
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks (IDs/checklist)
+      description: Planned TASK-### items for this Feature.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria

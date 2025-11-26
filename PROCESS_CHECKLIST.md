@@ -1,19 +1,19 @@
-# PROCESS_CHECKLIST.md — Governance Workflow (AGENT_CONTRACT v1.4)
+# PROCESS_CHECKLIST.md — Governance Workflow (AGENT_CONTRACT v1.6)
 
-In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract takes precedence. This is a high-level workflow gate companion; keep AGENT_CONTRACT.md unchanged. ADR format is `ADR-NNNN-kebab-case-title.md` (Contract §0.2).
+In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract takes precedence. This is a high-level workflow gate companion; AGENT_CONTRACT changes require an ADR Issue + File and supervisor approval. ADR format is `ADR-NNNN-kebab-case-title.md` (Contract §0.2).
 
 ## 0) Pre-Flight / Context Recovery (Contract §0.5, §19)
-- On startup/restart, read: PROJECT_POLICY.yaml, ADRs, CODE_MAP.md, docs/project_history/EPIC_LOG.md, Issues/PRs, git tags.
+- On startup/restart, read: PROJECT_POLICY.yaml, ADRs (Issues + Files), CODE_MAP.md, docs/project_history/EPIC_LOG.md, Issues/PRs, git tags.
 - Create CODE_MAP.md once structure exists; update after ≥3 module/file changes, major refactors, and at Epic reviews.
 - Maintain EPIC_LOG.md at Epic start/finish (scope, key changes, ADRs).
-- Exit gate: context reconstructed; PROJECT_POLICY exists with contract version noted; no unknown critical gaps before proceeding.
+- Exit gate: context reconstructed; PROJECT_POLICY exists with contract version noted; ADR Issues and Files consistent for known decisions (or discrepancies logged as Tasks); no unknown critical gaps before proceeding.
 
 ## 1) Interview → Policy/Governance (Contract §2, §6)
-- Confirm AGENT_CONTRACT v1.4; gather signals; fill PROJECT_POLICY.yaml (supervision_mode/window, workflow_profile, tier, repo_strategy, security_profile, cost guardrails, tech stack constraints, environments, domain toggles).
+- Confirm AGENT_CONTRACT v1.5; gather signals; fill PROJECT_POLICY.yaml (supervision_mode/window, workflow_profile, tier, repo_strategy, security_profile, cost guardrails, tech stack constraints, environments, domain toggles).
 - Cost guardrails: cost-incurring decisions (paid services, billable infra, exceeding free tiers) need explicit supervisor approval (Contract §0.3).
-- Record ADR-0001 (workflow_profile/tier/supervision/repo strategy); note ADR format.
-- Capture vision, users, flows, constraints; note ambiguity tier and Proposal Branch policy availability (Contract §4.4).
-- Exit gate: PROJECT_POLICY fully populated; VISION/REQUIREMENTS/USER_STORIES/RISK_REGISTER drafted with supervisor inputs; ADR-0001 recorded; ambiguities logged.
+- Record ADR-0001 (workflow_profile/tier/supervision/repo strategy) as ADR Issue + ADR File; note ADR format.
+- Capture vision, users, flows, constraints; note ambiguity tier and Proposal Branch policy availability (Contract §4.4). Initial capture may be in docs; codify BR/FR/NFR/US Issues for ongoing work.
+- Exit gate: PROJECT_POLICY fully populated; VISION/REQUIREMENTS/USER_STORIES/RISK_REGISTER drafted with supervisor inputs; ADR-0001 recorded (Issue + File) and linked; ambiguities logged; initial BR/FR/NFR/US items identified for issue capture.
 
 ## 2) Analysis & Profiling (Contract §4.1)
 - Derive risk_level, size_profile, criticality; verify workflow_profile/tier fit.
@@ -21,21 +21,22 @@ In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract t
 - Exit gate: risk/size/criticality documented; profile/tier validated; ADR for tech stack/runtime recorded; PROJECT_POLICY updated; key constraints/assumptions logged.
 
 ## 3) Design (Contract §3, §5)
-- Produce/refresh: VISION, REQUIREMENTS (F/NF), USER_STORIES (acceptance), ARCHITECTURE, DATA_MODEL, API_SPEC, TEST_STRATEGY, OBSERVABILITY_SPEC, SECURITY_NOTES/THREAT_MODEL (if high-risk/regulated or touching auth/PII/external integrations), DEPLOYMENT, CONFIGURATION/.env.example as soon as env/configs are introduced.
+- Produce/refresh: VISION, REQUIREMENTS (F/NF), USER_STORIES (acceptance), ARCHITECTURE, DATA_MODEL, API_SPEC, TEST_STRATEGY, OBSERVABILITY_SPEC, SECURITY_NOTES/THREAT_MODEL (if high-risk/regulated or touching auth/PII/external integrations), DEPLOYMENT, CONFIGURATION/.env.example as soon as env/configs are introduced, and a consolidated Software Design Review (`docs/SDR.md`) derived from interview outputs and aligned with BR/FR/NFR/US/ADRs.
 - Cross-check design/architecture against reference standards (OWASP Top 10/ASVS for web exposure, 12-Factor for services, SOLID/clean architecture for OO code); add a note in ARCHITECTURE or SECURITY docs on how major OWASP risks and 12-Factor principles are addressed when modifying services.
 - Digital minimalism (Contract §5.2): justify new deps only if >200 LOC to replace, active, de facto or complex domain; avoid micro-utilities (<50 LOC) and unnecessary heavy frameworks.
-- Record major design decisions as ADRs (data store, auth, integrations, cost-impact, security posture).
-- Design exit gate: architecture/API/obs/test/security docs must be actionable—identify modules/components, primary flows, error/status handling, determinism, inputs/outputs, and observability hooks so that tasks can enumerate concrete files/tests later. If docs are too high-level to derive task steps, stay in Design.
+- Record major design decisions as ADR Issues + ADR Files (data store, auth, integrations, cost-impact, security posture) linked to affected BR/FR/NFR/US/Epics/Features/Tasks.
+- Ensure design artefacts are traceable to BR/FR/NFR/US Issues; update docs to reflect the issue-set.
+- Design exit gate: architecture/API/obs/test/security docs must be actionable—identify modules/components, primary flows, error/status handling, determinism, inputs/outputs, and observability hooks so that tasks can enumerate concrete files/tests later. Key decisions (data store, auth, integrations, cost/security posture) are captured as ADR Issue + ADR File with impacted work-item links. SDR.md generated/updated as the canonical design summary. If docs are too high-level to derive task steps, stay in Design.
 
 ## 4) Planning (Contract §6)
-- Build backlog: Epics → Features → Tasks/Bugs with acceptance criteria linked to requirements/ADRs.
+- Build backlog: Epics → Features → Tasks/Bugs with acceptance criteria linked to requirements/ADRs and BR/FR/NFR/US Issues (per traceability model).
 - Configure project board (Backlog/Ready/In Progress/In Review/Ready for Human Review/Done).
 - Tag scheme: tag Epic start `epic-<id>-start`; plan feature checkpoint tags `epic-<id>-feature-<name>-done`; Epic completion `epic-<id>-complete`.
 - Repo hygiene: README/CONTRIBUTING; CODE_MAP.md once code structure spans more than a trivial stub; baseline configs `.editorconfig`, formatter/linter configs, and `pre-commit` hooks covering format, lint, secrets, and basic dependency/security scans.
 - CI/CD per tier and aligned to the Quality Gates Matrix: lint/format, tests, coverage gates (guard against >2pp coverage drop on affected components unless justified), security scans (deps/secrets/SAST), build.
 - Templates: Issue/PR templates include ADR check and Critic Pass reminder.
 - Ensure branch protection and PR-based workflow; self-merge only when Pinky Swear conditions met (Contract §15.1).
-- Planning exit gate (execution-ready backlog): each Task must include 4–7 concrete steps and a Definition of Done covering implementation, required tests (with coverage targets per component), observability/logging updates, docs/ADR updates, CI/config changes, dependencies, and risk notes. Add an Execution Plan per Epic (critical path, parallelizable items, prerequisites, mapping to CI scripts/observability). Do not advance to Setup/Implementation until a Critic Pass confirms the backlog meets this bar.
+- Planning exit gate (execution-ready backlog): each Task must include 4–7 concrete steps and a Definition of Done covering implementation, required tests (with coverage targets per component), observability/logging updates, docs/ADR updates, CI/config changes, dependencies, and risk notes. Add an Execution Plan per Epic (critical path, parallelizable items, prerequisites, mapping to CI scripts/observability). Ensure links: Feature → FR/US; Task → Parent Feature (and Source Bug if applicable); Bug → Parent Feature (Fix Tasks planned). Do not advance to Setup/Implementation until a Critic Pass confirms the backlog meets this bar.
 
 ## 5) Setup / Repo Hygiene (Contract §5, §15)
 - Scaffold baseline files/configs: `.editorconfig`, formatter and linter configs, `pre-commit` with format/lint/secrets/dependency checks.
@@ -46,7 +47,7 @@ In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract t
 
 ## 6) Implementation (per Task/Feature loop) (Contract §9, §15.1)
 - Quality Gate: classify Task risk_level + tier (quick_fix/standard/strategic) → apply Quality Gates Matrix; ensure required tests/coverage/security/observability are satisfied and cite the applied gate in the PR.
-- Understand → Plan (3–7 steps incl. tests/obs/security/risks/ambiguity tier and gate expectations) → Implement (respect architecture; update CODE_MAP on structural change) → Test (unit/API/integration/E2E per gate; determinism; avoid >2pp coverage drop on affected components unless justified) → Static checks.
+- Understand → Plan (3–7 steps incl. tests/obs/security/risks/ambiguity tier and gate expectations; read Parent Feature and linked BR/FR/NFR/US; set Source Bug if applicable) → Implement (respect architecture; update CODE_MAP on structural change) → Test (unit/API/integration/E2E per gate; determinism; avoid >2pp coverage drop on affected components unless justified) → Static checks.
 - Docs & logging: docstrings and public API docs added/updated for all non-trivial modules touched; logging follows structured logging and no-secrets rules with correlation/trace IDs when available.
 - Observability: primary impacted operation identified; metrics/logs/traces updated or added for that operation; SLO/SLI docs reviewed and updated if needed.
 - Pattern Playbooks: does this Task match a Pattern Playbook? If yes, complete all required steps and reference the pattern name in the PR.
@@ -55,7 +56,8 @@ In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract t
 - Ambiguity handling: apply 3-tier model (self-resolve; propose options; stop/seek approval) and log decisions.
 - CI/repo hygiene: pre-commit hooks added/updated if needed; CI pipeline updated if new quality requirements are introduced; all required CI jobs passing for this PR.
 - Summarize: update Issue/board; add feature checkpoint tags for major Features.
-- Exit gate (per Task/PR): required tests and coverage per gate passing in CI; observability/logging updated; docs/ADRs updated; CODE_MAP updated on structural change; Critic Pass done; board/issue updated; no unresolved red-flag items.
+- ADRs: if change requires a major decision/update, create/update ADR Issue + File before wide-reaching implementation and link impacted items.
+- Exit gate (per Task/PR): required tests and coverage per gate passing in CI; observability/logging updated; docs/ADRs updated; CODE_MAP updated on structural change; Critic Pass done; board/issue updated; Bugs fixed via Tasks with Source Bug set; no unresolved red-flag items.
 
 ## 7) Maintenance/Refactor (Contract §12)
 - Classify refactor (local/medium/major); ADR for medium/major with scope/risks/rollback.
@@ -65,11 +67,11 @@ In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract t
 ## 8) Release / Epic Review (Contract §16.2, §17, §19)
 - Epic Review Bundle is tiered:
   - Minimal: completion summary; features/tasks traceability; architecture integrity check.
-  - Standard: above + security/compliance; observability; testing/coverage; CI/CD status.
-  - Enterprise: above + deployment readiness; risks/limitations/follow-ups; ADR index.
+  - Standard: above + security/compliance; observability; testing/coverage; CI/CD status; BR/FR/NFR/US coverage/gaps for delivered scope.
+  - Enterprise: above + deployment readiness; risks/limitations/follow-ups; ADR index; requirements traceability note.
 - Update EPIC_LOG.md; apply tags `epic-<id>-feature-<name>-done` (as used) and `epic-<id>-complete`.
 - Epic-level metrics collected (Blockers, CI failures per PR before passing, post-merge regressions, coverage trends) and at least one process improvement added to EPIC_LOG.md.
-- Exit gate: Epic Review bundle complete per tier; EPIC_LOG updated; tags applied; follow-up Issues/risks documented; metrics captured; approvals obtained.
+- Exit gate: Epic Review bundle complete per tier; ADRs created/updated/superseded noted; EPIC_LOG updated; tags applied; follow-up Issues/risks documented; metrics captured; approvals obtained.
 
 ## 9) Incident / Recovery (Contract §16)
 - Circuit breaker: max 5 CI attempts; stop if 3 consecutive similar failures. Open Blocker Issue; revert to safe point (pre-Task commit or Epic checkpoint); pause risky work.
@@ -81,6 +83,7 @@ In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract t
 
 ## 10) Ambiguity & Approval Management (Contract §4.4, §10, §11)
 - Scope/profile/tier/requirements changes: stop impacted work; draft options (minimal/recommended/ambitious); ADR + supervisor approval; default to conservative option until confirmed.
+- Material requirement changes must update/create BR/FR/NFR/US Issues (and ADR if needed) before proceeding.
 - Cost-incurring changes require explicit approval.
 - Proposal Branch policy (Contract §4.4): naming `proposal/<decision-id>-<desc>`; mark PRs `[PROPOSAL]`; max 3 active; rebase at least weekly; close/mark stale after 1.5× response window; use when awaiting high-risk approvals (tier changes, architecture changes, Tier 3 ambiguities).
 - Exit gate: ambiguity resolved or approval obtained; ADR/decision captured; scope/backlog updated; risks/assumptions recorded; no open Tier 3 ambiguities blocking work.
@@ -95,3 +98,4 @@ In case of conflict between this checklist and AGENT_CONTRACT.md, the Contract t
 - Added Quality Gates Matrix application, Critic Pass Procedure reference, and Pattern Playbook checks to Implementation flow.
 - Added repo hygiene/CI expectations, structured logging/docstring requirements, observability tasks, and SLO review steps.
 - Added Epic-level metrics and continuous-improvement prompts for EPIC_LOG.md updates.
+- Added BR/FR/NFR/US work-item types, ADR Issues + Files, traceability rules, Bug→Task workflow with CI-driven Bugs, and planning/implementation checks to enforce links.

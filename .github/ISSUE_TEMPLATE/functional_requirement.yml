@@ -1,0 +1,64 @@
+name: 'Functional Requirement (FR)'
+description: Capture a functional requirement (FR-###) linked to a Business Requirement.
+title: 'FR-: '
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** FRs describe system behaviour. Derive Features/User Stories/Tasks from FRs; do not implement directly unless explicitly instructed.
+  - type: input
+    id: reference_id
+    attributes:
+      label: Reference ID
+      description: Format FR-### (e.g., FR-001)
+      placeholder: FR-001
+    validations:
+      required: true
+  - type: input
+    id: parent_br
+    attributes:
+      label: Parent Business Requirement (BR-###)
+      placeholder: BR-001
+    validations:
+      required: true
+  - type: input
+    id: title
+    attributes:
+      label: Title
+      description: Concise requirement name.
+    validations:
+      required: true
+  - type: input
+    id: requirement_statement
+    attributes:
+      label: Requirement Statement
+      description: Single sentence of required behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: detailed_spec
+    attributes:
+      label: Detailed Specification
+      description: Inputs/outputs, rules, flows.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Checklist or Gherkin scenarios.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Known limits or policies.
+  - type: textarea
+    id: traceability
+    attributes:
+      label: Traceability (BR required; related NFRs, User Stories)
+      description: Reference BR, related NFRs, User Stories.
+    validations:
+      required: true

@@ -1,0 +1,6 @@
+# Placeholder frontend Dockerfile; to be updated when frontend scaffold lands.
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json /app/
+RUN npm install || true
+CMD ["npm", "run", "dev", "--", "--host", "--port", "5173"]

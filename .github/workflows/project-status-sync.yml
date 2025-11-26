@@ -1,0 +1,118 @@
+name: Project Status Sync
+
+on:
+  issues:
+    types: [opened, reopened, edited, labeled]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_PAT: ${{ secrets.PROJECT_PAT }}
+    steps:
+      - name: Sync board column based on status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PROJECT_PAT }}
+          script: |
+            const projectUrl = 'https://github.com/users/tucktuck101/projects/6';
+            const issue = context.payload.issue;
+            if (!issue) {
+              core.info('No issue payload; skipping.');
+              return;
+            }
+
+            // Helper: map status text to Board Column
+            function mapColumn(type, status) {
+              const val = (status || '').toLowerCase().trim();
+              if (type === 'bug') {
+                if (val === 'in progress') return 'In Progress';
+                if (val.startsWith('fixed')) return 'Ready for Human Review';
+                if (val === 'done') return 'Done';
+                return 'Backlog';
+              }
+              if (type === 'adr') {
+                if (val === 'accepted') return 'Ready';
+                if (val === 'rejected' || val === 'superseded' || val === 'deprecated') return 'Done';
+                return 'Backlog'; // proposed or unknown
+              }
+              return 'Backlog';
+            }
+
+            // Determine type from labels
+            const labels = (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name.toLowerCase()));
+            const isBug = labels.includes('bug');
+            const isAdr = labels.includes('adr');
+
+            // Parse status from body (Issue Forms render as "Status" followed by the value)
+            const statusMatch = issue.body.match(/Status\\s*\\n\\s*([\\w:\\- ]+)/i);
+            const statusVal = statusMatch ? statusMatch[1].trim() : '';
+            const column = mapColumn(isBug ? 'bug' : isAdr ? 'adr' : '', statusVal);
+
+            // Resolve project ID and column option ID via REST/GraphQL is cumbersome here; we use known IDs from field-list.
+            const columnMap = {
+              'Backlog': '8b83c5cc',
+              'Ready': '0e270712',
+              'In Progress': '433eacb2',
+              'In Review': 'dd5e1342',
+              'Ready for Human Review': 'c0af4c76',
+              'Done': 'b7adf013',
+            };
+            const columnId = columnMap[column];
+            if (!columnId) {
+              core.warning(`Unknown column mapping for ${column}; skipping.`);
+              return;
+            }
+
+            // Fetch projectId once
+            const projRes = await github.request('POST https://api.github.com/graphql', {
+              headers: { Authorization: `Bearer ${process.env.PROJECT_PAT}` },
+              query: `
+                query($login: String!) {
+                  user(login:$login) {
+                    projectV2(number: 6) { id }
+                  }
+                }
+              `,
+              variables: { login: context.repo.owner },
+            });
+            const projectId = projRes.data.user?.projectV2?.id;
+            if (!projectId) {
+              core.warning('Project ID not found; skipping.');
+              return;
+            }
+
+            // Add item
+            const addResult = await github.request('POST https://api.github.com/graphql', {
+              headers: { Authorization: `Bearer ${process.env.PROJECT_PAT}` },
+              query: `
+                mutation($project: ID!, $content: ID!) {
+                  addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
+                    item { id }
+                  }
+                }
+              `,
+              variables: { project: projectId, content: issue.node_id },
+            });
+            const itemId = addResult.data.addProjectV2ItemById?.item?.id;
+            if (!itemId) {
+              core.warning('Project item ID not obtained; skipping.');
+              return;
+            }
+
+            // Update Board Column field
+            await github.request('POST https://api.github.com/graphql', {
+              headers: { Authorization: `Bearer ${process.env.PROJECT_PAT}` },
+              query: `
+                mutation($project: ID!, $item: ID!, $column: String!) {
+                  updateProjectV2ItemFieldValue(input:{
+                    projectId: $project,
+                    itemId: $item,
+                    fieldId: "PVTSSF_lAHOBDlnjs4BJIUqzg5YqsA",
+                    value:{singleSelectOptionId:$column}
+                  }) { projectV2Item { id } }
+                }
+              `,
+              variables: { project: projectId, item: itemId, column: columnId },
+            });
+            core.info(`Synced issue #${issue.number} to column ${column}`);

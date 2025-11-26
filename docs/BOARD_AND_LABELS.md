@@ -12,6 +12,9 @@
   - `Board Column` (single select): Backlog, Ready, In Progress, In Review, Ready for Human Review, Done.
   - `Type` (single select): Epic, Feature, Task, Bug, Tech Debt, Refactor, Incident, BLOCKER.
   - Use Status field as needed; prefer `Board Column` for workflow stage.
+  - Workflows auto-add items to the board (requires `PROJECT_PAT` secret):
+    - `.github/workflows/project-issues.yml`: issues → Board Column = Backlog.
+    - `.github/workflows/project-prs.yml`: PRs → In Review on open; Done on close/merge.
 
 ## Usage
 - Every issue/task includes: acceptance criteria, linked requirements/ADRs, risk level, task tier, Quality Gate row, DoD (tests/coverage/obs/docs/CI), dependencies, and Critic Pass reminder.

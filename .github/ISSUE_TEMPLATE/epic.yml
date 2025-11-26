@@ -1,0 +1,68 @@
+name: 'Epic'
+description: Plan an Epic linked to BRs/FRs/USs and composed of Features.
+title: 'EPIC-: '
+labels: ['Epic']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** Epics define scope and traceability; do not put implementation here. Derive Features/Tasks and keep links up to date.
+  - type: input
+    id: reference_id
+    attributes:
+      label: Reference ID
+      description: Format EPIC-### (e.g., EPIC-001)
+      placeholder: EPIC-001
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Epic goal and outcomes.
+    validations:
+      required: true
+  - type: textarea
+    id: problem_context
+    attributes:
+      label: Problem / Context
+  - type: textarea
+    id: business_requirements
+    attributes:
+      label: Business Requirements (BR-IDs)
+      description: List linked BRs.
+    validations:
+      required: true
+  - type: textarea
+    id: functional_requirements
+    attributes:
+      label: Functional Requirements (FR-IDs)
+      description: List linked FRs.
+    validations:
+      required: true
+  - type: textarea
+    id: non_functional_requirements
+    attributes:
+      label: Non-Functional Requirements (NFR-IDs)
+  - type: textarea
+    id: user_stories
+    attributes:
+      label: User Stories (US-IDs)
+  - type: textarea
+    id: features
+    attributes:
+      label: Features
+      description: Planned Features for this Epic.
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope (In / Out)
+      description: List in-scope vs out-of-scope items.
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks / Constraints
+  - type: textarea
+    id: success_metrics
+    attributes:
+      label: Success Metrics / SLIs
