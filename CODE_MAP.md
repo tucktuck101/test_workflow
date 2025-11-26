@@ -17,8 +17,10 @@
 - `app/`: FastAPI scaffold and configuration.
   - `config.py`: environment/config parsing and validation (paths, devices, limits).
   - `main.py`: FastAPI app factory and uvicorn runner.
+- `app/engine.py`: game session model, ship placement (deterministic-capable), move adjudication, in-memory session store.
 - `tests/`: Python tests.
   - `test_config.py`: settings/env validation and app smoke test.
+  - `test_engine.py`: game engine/session tests (determinism, validation, outcomes).
 - `requirements.txt`: Python dependencies (fastapi, uvicorn, pytest).
 
 ## Planned Additions
