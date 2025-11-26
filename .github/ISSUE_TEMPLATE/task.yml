@@ -1,0 +1,97 @@
+name: "Task"
+description: Smallest unit of planned work tied to a Feature (and optional Bug).
+title: "TASK-: "
+labels: ["Task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** Read the Parent Feature and linked requirements before coding. If sourced from a Bug, set Source Bug. Work within scope; no large refactors unless designated. Update the Bug when fix Tasks complete.
+  - type: input
+    id: reference_id
+    attributes:
+      label: Reference ID
+      description: Format TASK-### (e.g., TASK-001)
+      placeholder: TASK-001
+    validations:
+      required: true
+  - type: input
+    id: parent_feature
+    attributes:
+      label: Parent Feature (FEAT-###)
+      placeholder: FEAT-001
+    validations:
+      required: true
+  - type: input
+    id: source_bug
+    attributes:
+      label: Source Bug (if applicable, BUG-###)
+      placeholder: BUG-001
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Complexity
+      options:
+        - S
+        - M
+        - L
+    validations:
+      required: true
+  - type: dropdown
+    id: work_type
+    attributes:
+      label: Work Type
+      options:
+        - code
+        - config
+        - docs
+        - test
+        - refactor
+        - bugfix
+        - ops
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Reference Parent Feature and Source Bug if present.
+    validations:
+      required: true
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current Behavior
+  - type: textarea
+    id: desired_behavior
+    attributes:
+      label: Desired Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+  - type: textarea
+    id: implementation_hints
+    attributes:
+      label: Implementation Hints (optional)
+  - type: textarea
+    id: tests
+    attributes:
+      label: Test & Validation Requirements
+      description: What tests/coverage/validation are required?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+    validations:
+      required: true

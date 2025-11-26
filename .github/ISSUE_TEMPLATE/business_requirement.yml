@@ -1,0 +1,73 @@
+name: "Business Requirement (BR)"
+description: Capture a business outcome (BR-###) linked to an Epic and downstream requirements.
+title: "BR-: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** BRs express business outcomes. Do not implement directly from a BR. Link to Epics/requirements and derive Features/Tasks downstream.
+  - type: input
+    id: reference_id
+    attributes:
+      label: Reference ID
+      description: Format BR-### (e.g., BR-001)
+      placeholder: BR-001
+    validations:
+      required: true
+  - type: input
+    id: parent_epic
+    attributes:
+      label: Parent Epic
+      description: Epic issue URL/ID this BR maps to.
+      placeholder: EPIC-###
+    validations:
+      required: true
+  - type: input
+    id: title
+    attributes:
+      label: Title
+      description: Concise business outcome title.
+    validations:
+      required: true
+  - type: textarea
+    id: business_outcome
+    attributes:
+      label: Business Outcome
+      description: Desired business result.
+    validations:
+      required: true
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Problem Statement
+      description: What problem are we solving?
+    validations:
+      required: true
+  - type: textarea
+    id: success_metrics
+    attributes:
+      label: Success Metrics / KPIs
+      description: How will success be measured?
+    validations:
+      required: true
+  - type: textarea
+    id: scope_in
+    attributes:
+      label: In Scope
+    validations:
+      required: true
+  - type: textarea
+    id: scope_out
+    attributes:
+      label: Out of Scope
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints & Policies
+      description: Compliance, commercial, technical constraints.
+  - type: textarea
+    id: linked_requirements
+    attributes:
+      label: Linked Requirements (FR/NFR/US)
+      description: List linked FRs, NFRs, and User Stories.
