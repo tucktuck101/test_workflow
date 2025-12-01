@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.schemas import PlayerType
 
 
 def _make_app(monkeypatch, tmp_path: Path, **env_overrides):
@@ -40,6 +41,7 @@ def test_start_and_move_flow(monkeypatch, tmp_path):
     data = move_resp.json()
     assert "player_result" in data
     assert data["status"] in {"in_progress", "player_won", "agent_won"}
+    assert data["agent_move"]["x"] >= 0
 
 
 def test_start_with_placements(monkeypatch, tmp_path):
@@ -57,6 +59,8 @@ def test_start_with_placements(monkeypatch, tmp_path):
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "in_progress"
+    assert body["player_type"] == PlayerType.human.value
+    assert body["agent_type"] == PlayerType.dqn_agent.value
 
 def test_duplicate_move_returns_400(monkeypatch, tmp_path):
     client = _make_app(monkeypatch, tmp_path)
@@ -114,3 +118,68 @@ def test_inference_failure_aborts_game(monkeypatch, tmp_path):
     # subsequent moves should now see the game as finished/aborted
     resp2 = client.post(f"/api/games/{game_id}/moves", json={"x": 1, "y": 1})
     assert resp2.status_code == 409
+
+
+def test_autoplay_bot_vs_bot(monkeypatch, tmp_path):
+    client = _make_app(monkeypatch, tmp_path)
+    payload = {
+        "config": {
+            "player_type": "random_bot",
+            "agent_type": "heuristic_bot",
+            "auto_play": True,
+        }
+    }
+    resp = client.post("/api/games", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["auto_play"] is True
+    assert data["status"] in {"player_won", "agent_won"}
+    flattened = [cell for row in data["agent_board_masked"] for cell in row]
+    assert any(cell != "unknown" for cell in flattened)
+
+
+def test_autoplay_requires_bots(monkeypatch, tmp_path):
+    client = _make_app(monkeypatch, tmp_path)
+    payload = {"config": {"player_type": "human", "agent_type": "random_bot", "auto_play": True}}
+    resp = client.post("/api/games", json=payload)
+    assert resp.status_code == 400
+    assert resp.json()["detail"]["error_code"] == "invalid_payload"
+
+
+def test_stepwise_with_random_agent(monkeypatch, tmp_path):
+    client = _make_app(monkeypatch, tmp_path)
+    payload = {"config": {"agent_type": "random_bot"}}
+    start = client.post("/api/games", json=payload)
+    assert start.status_code == 200
+    game_id = start.json()["game_id"]
+    move = client.post(f"/api/games/{game_id}/moves", json={"x": 0, "y": 0})
+    assert move.status_code == 200
+    assert move.json()["agent_move"]["x"] >= 0
+
+
+def test_autoplay_dqn_vs_random(monkeypatch, tmp_path):
+    client = _make_app(monkeypatch, tmp_path)
+    payload = {"config": {"player_type": "dqn_agent", "agent_type": "random_bot", "auto_play": True}}
+    resp = client.post("/api/games", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] in {"player_won", "agent_won"}
+    assert data["player_type"] == PlayerType.dqn_agent.value
+
+
+def test_autoplay_random_vs_dqn(monkeypatch, tmp_path):
+    client = _make_app(monkeypatch, tmp_path)
+    payload = {"config": {"player_type": "random_bot", "agent_type": "dqn_agent", "auto_play": True}}
+    resp = client.post("/api/games", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] in {"player_won", "agent_won"}
+    assert data["agent_type"] == PlayerType.dqn_agent.value
+
+
+def test_autoplay_heuristic_vs_random(monkeypatch, tmp_path):
+    client = _make_app(monkeypatch, tmp_path)
+    payload = {"config": {"player_type": "heuristic_bot", "agent_type": "random_bot", "auto_play": True}}
+    resp = client.post("/api/games", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["status"] in {"player_won", "agent_won"}

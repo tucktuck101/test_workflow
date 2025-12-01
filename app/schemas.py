@@ -2,10 +2,27 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from .engine import PlayerType
+
+
+class GameConfig(BaseModel):
+    player_type: PlayerType = PlayerType.human
+    agent_type: PlayerType = PlayerType.dqn_agent
+    auto_play: bool = False
+
 
 class Placement(BaseModel):
     name: str
     coordinates: List[List[int]]
+
+
+class GameCreateRequest(BaseModel):
+    placements: List[Placement] | None = Field(default=None, alias="placements")
+    config: GameConfig | None = None
+
+    class Config:
+        allow_population_by_field_name = True
+        extra = "forbid"
 
 
 class GameStartResponse(BaseModel):
@@ -15,6 +32,9 @@ class GameStartResponse(BaseModel):
     status: str
     model_version: Optional[str] = None
     model_hash: Optional[str] = None
+    player_type: PlayerType = PlayerType.human
+    agent_type: PlayerType = PlayerType.dqn_agent
+    auto_play: bool = False
 
 
 class MoveRequest(BaseModel):

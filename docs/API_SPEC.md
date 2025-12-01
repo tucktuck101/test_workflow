@@ -18,8 +18,18 @@ Auth: none (anonymous MVP).
   ```
 
 ## POST /games
-- Description: Start a new game session.
-- Request: none (body reserved for future options; reject unexpected fields with 400).
+- Description: Start a new game session. Supports player type selection and optional bot-vs-bot auto-play.
+- Request (all fields optional):
+  ```json
+  {
+    "placements": [ { "name": "Carrier", "coordinates": [[0,0], [1,0], [2,0], [3,0], [4,0]] } ],
+    "config": {
+      "player_type": "human|random_bot|heuristic_bot|dqn_agent",
+      "agent_type": "random_bot|heuristic_bot|dqn_agent",   // human agent is rejected
+      "auto_play": false                                     // when true, both sides must be bots; game runs to completion server-side
+    }
+  }
+  ```
 - Responses:
   - 200:
   ```json
@@ -27,7 +37,10 @@ Auth: none (anonymous MVP).
     "game_id": "uuid",
     "board": {...},        // player view
     "agent_board_masked": {...}, // masked agent board for client (if exposed)
-    "status": "in_progress",
+    "status": "in_progress|player_won|agent_won|aborted",
+    "player_type": "human",
+    "agent_type": "dqn_agent",
+    "auto_play": false,
     "model_version": "v1.0.0",
     "model_hash": "sha256..."
   }

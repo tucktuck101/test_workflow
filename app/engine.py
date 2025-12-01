@@ -16,6 +16,20 @@ class GameStatus(str, enum.Enum):
     ABORTED = "aborted"
 
 
+class PlayerType(str, enum.Enum):
+    HUMAN = "human"
+    RANDOM_BOT = "random_bot"
+    HEURISTIC_BOT = "heuristic_bot"
+    DQN_AGENT = "dqn_agent"
+
+
+@dataclass
+class GameConfig:
+    player_type: PlayerType = PlayerType.HUMAN
+    agent_type: PlayerType = PlayerType.DQN_AGENT
+    auto_play: bool = False
+
+
 class MoveOutcome(str, enum.Enum):
     MISS = "miss"
     HIT = "hit"
@@ -60,6 +74,7 @@ class GameSession:
     move_history: List[Dict] = field(default_factory=list)
     status: GameStatus = GameStatus.IN_PROGRESS
     deterministic_seed: Optional[int] = None
+    config: GameConfig = field(default_factory=GameConfig)
 
     def is_finished(self) -> bool:
         return self.status != GameStatus.IN_PROGRESS
@@ -153,7 +168,7 @@ def validate_placements(board_size: int, placements: List[Ship], *, allow_adjace
         raise InvalidMove("invalid_coordinates")
 
 
-def create_session(board_size: int, deterministic_seed: Optional[int] = None) -> GameSession:
+def create_session(board_size: int, deterministic_seed: Optional[int] = None, config: GameConfig | None = None) -> GameSession:
     rng = random.Random(deterministic_seed)
     player_ships = _place_ships(board_size, rng)
     agent_ships = _place_ships(board_size, rng)
@@ -163,10 +178,11 @@ def create_session(board_size: int, deterministic_seed: Optional[int] = None) ->
         player_ships=player_ships,
         agent_ships=agent_ships,
         deterministic_seed=deterministic_seed,
+        config=config or GameConfig(),
     )
 
 
-def create_session_with_player(board_size: int, placements: List[Ship], deterministic_seed: Optional[int] = None) -> GameSession:
+def create_session_with_player(board_size: int, placements: List[Ship], deterministic_seed: Optional[int] = None, config: GameConfig | None = None) -> GameSession:
     rng = random.Random(deterministic_seed)
     agent_ships = _place_ships(board_size, rng)
     return GameSession(
@@ -175,6 +191,7 @@ def create_session_with_player(board_size: int, placements: List[Ship], determin
         player_ships=placements,
         agent_ships=agent_ships,
         deterministic_seed=deterministic_seed,
+        config=config or GameConfig(),
     )
 
 
@@ -242,10 +259,10 @@ class InMemorySessionStore:
         self._ttl = ttl_seconds
         self._created_at: Dict[str, float] = {}
 
-    def create(self, board_size: int, deterministic_seed: Optional[int] = None) -> GameSession:
+    def create(self, board_size: int, deterministic_seed: Optional[int] = None, config: GameConfig | None = None) -> GameSession:
         if self._max is not None and len(self._sessions) >= self._max:
             raise InvalidMove("capacity_exceeded")
-        session = create_session(board_size, deterministic_seed)
+        session = create_session(board_size, deterministic_seed, config=config)
         self._sessions[session.game_id] = session
         self._created_at[session.game_id] = time.time()
         return session
