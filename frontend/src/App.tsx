@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE, fetchReadiness, makeMove, mapError, quitGame, startGame } from './api';
-import type { CellState, GameStatus, MoveResponse, ReadyResponse } from './types';
+import type { CellState, GameStatus, MoveResponse, PlayerType, ReadyResponse } from './types';
 
 interface BoardProps {
   grid: CellState[][];
@@ -76,6 +76,9 @@ function App() {
   const [agentBoard, setAgentBoard] = useState<CellState[][]>(emptyBoard(10));
   const [gameId, setGameId] = useState<string | null>(null);
   const [status, setStatus] = useState<GameStatus | 'ready'>('ready');
+  const [playerType, setPlayerType] = useState<PlayerType>('human');
+  const [agentType, setAgentType] = useState<PlayerType>('dqn_agent');
+  const [autoPlay, setAutoPlay] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [moveLoading, setMoveLoading] = useState(false);
@@ -108,7 +111,7 @@ function App() {
 
   function resetPlacement() {
     const size = board.length || 10;
-    setPlacementMode(true);
+    setPlacementMode(playerType === 'human');
     setPlacementMap({});
     setCurrentShipIdx(0);
     setOrientation('horizontal');
@@ -132,25 +135,43 @@ function App() {
 
   async function handleStart() {
     setError(null);
+    if (autoPlay && (playerType === 'human' || agentType === 'human')) {
+        setError('Auto-play requires both players to be bots.');
+        return;
+    }
+    if (playerType !== 'human' && !autoPlay) {
+      setError('Non-human players require auto-play enabled.');
+      return;
+    }
     // First click enters placement mode; second confirms once fleet is placed.
-    if (!placementMode) {
+    if (playerType === 'human' && !placementMode) {
       resetPlacement();
       return;
     }
-    if (Object.keys(placementMap).length !== SHIPS.length) {
+    if (playerType === 'human' && Object.keys(placementMap).length !== SHIPS.length) {
       setError(`Place all ships (${FLEET_SIZE} cells) before starting.`);
       return;
     }
     setLoading(true);
     try {
       const placementPayload = buildPlacementsPayload();
-      const res = await startGame(placementPayload);
+      const payload =
+        playerType === 'human' && placementPayload ? { placements: placementPayload.placements } : undefined;
+      const res = await startGame({
+        ...(payload || {}),
+        config: { player_type: playerType, agent_type: agentType, auto_play: autoPlay },
+      });
       setGameId(res.game_id);
       setBoard(res.board);
       setAgentBoard(res.agent_board_masked);
       setStatus(res.status);
       setModelMeta({ version: res.model_version, hash: res.model_hash });
-      setLogs([{ tone: 'info', message: 'Fleet deployed. Take your shot.' }]);
+      setLogs([
+        {
+          tone: 'info',
+          message: res.auto_play ? `Auto-play completed: ${statusCopy[res.status]} (${res.player_type} vs ${res.agent_type}).` : 'Fleet deployed. Take your shot.',
+        },
+      ]);
       setPlacementMode(false);
       setPlacementMap({});
     } catch (err: any) {
@@ -257,7 +278,7 @@ function App() {
   }
 
   const isFinished = status !== 'in_progress' && status !== 'ready';
-  const moveDisabled = !gameId || moveLoading || isFinished || placementMode;
+  const moveDisabled = !gameId || moveLoading || isFinished || placementMode || autoPlay;
   const startLabel = placementMode ? 'Confirm placements' : 'Start Game';
   const currentShip = placementMode ? SHIPS[currentShipIdx] : null;
 
@@ -275,7 +296,43 @@ function App() {
       </header>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="controls">
+        <div className="controls" style={{ gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <label htmlFor="player-type">You</label>
+            <select
+              id="player-type"
+              value={playerType}
+              onChange={(e) => setPlayerType(e.target.value as PlayerType)}
+              disabled={loading || gameId !== null}
+            >
+              <option value="human">Human</option>
+              <option value="random_bot">Random Bot</option>
+              <option value="heuristic_bot">Heuristic Bot</option>
+              <option value="dqn_agent">DQN Agent</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <label htmlFor="agent-type">Opponent</label>
+            <select
+              id="agent-type"
+              value={agentType}
+              onChange={(e) => setAgentType(e.target.value as PlayerType)}
+              disabled={loading || gameId !== null}
+            >
+              <option value="dqn_agent">DQN Agent</option>
+              <option value="random_bot">Random Bot</option>
+              <option value="heuristic_bot">Heuristic Bot</option>
+            </select>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={autoPlay}
+              onChange={(e) => setAutoPlay(e.target.checked)}
+              disabled={loading || gameId !== null}
+            />
+            Auto-play (bot vs bot)
+          </label>
           <button className="button" onClick={handleStart} disabled={loading} aria-busy={loading}>
             {startLabel}
           </button>
@@ -284,6 +341,9 @@ function App() {
           </button>
           <span style={{ color: 'var(--muted)', fontSize: 14 }}>API: {API_BASE}</span>
         </div>
+        <p style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+          Tip: Auto-play requires both sides to be bots. Human games run turn-by-turn and require placing your fleet first.
+        </p>
         {placementMode && currentShip && (
           <div className="status-line" style={{ marginTop: 10, gap: 12, flexWrap: 'wrap' }}>
             <span>
@@ -331,9 +391,9 @@ function App() {
         />
         <Board
           grid={agentBoard}
-          label="Agent Board (click to fire)"
+          label={autoPlay ? 'Agent Board (auto-played)' : 'Agent Board (click to fire)'}
           disabled={moveDisabled}
-          onCellClick={handleMove}
+          onCellClick={autoPlay ? undefined : handleMove}
         />
       </div>
 
@@ -347,6 +407,16 @@ function App() {
             <div key={idx} className={`message ${entry.tone === 'warn' ? 'warn' : entry.tone}`}>{entry.message}</div>
           ))}
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <strong>Player types</strong>
+        <ul style={{ marginTop: 6, paddingLeft: 18, color: 'var(--muted)' }}>
+          <li><strong>Human</strong>: you place ships and fire shots manually.</li>
+          <li><strong>Random Bot</strong>: fires uniformly at unknown cells.</li>
+          <li><strong>Heuristic Bot</strong>: hunt/target strategy that chases hits.</li>
+          <li><strong>DQN Agent</strong>: uses the loaded RL model for moves.</li>
+        </ul>
       </div>
     </div>
   );

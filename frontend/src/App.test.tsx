@@ -32,6 +32,21 @@ const movePayload = {
   status: 'in_progress',
 };
 
+const autoPlayPayload = {
+  game_id: 'auto-1',
+  board: makeBoard('unknown'),
+  agent_board_masked: (() => {
+    const b = makeBoard('unknown');
+    b[0][0] = 'hit';
+    b[1][1] = 'miss';
+    return b;
+  })(),
+  status: 'player_won',
+  player_type: 'random_bot',
+  agent_type: 'heuristic_bot',
+  auto_play: true,
+};
+
 function makeFetcher(handler: FetchHandler) {
   return vi.fn(async (url: string, init?: RequestInit) => handler(url.toString(), init));
 }
@@ -98,6 +113,54 @@ describe('App', () => {
     fireEvent.click(cells[0]);
 
     await waitFor(() => expect(screen.getByText(/Agent fired/)).toBeInTheDocument());
+  });
+
+  it('auto-plays bot vs bot and renders outcome', async () => {
+    const fetchMock = makeFetcher((url, init) => {
+      if (url.includes('/health/ready')) return jsonResponse({ status: 'ready', model_version: 'v', model_hash: 'h', device: 'cpu' });
+      if (url.endsWith('/api/games')) {
+        const body = init?.body ? JSON.parse(init.body.toString()) : {};
+        expect(body?.config?.auto_play).toBe(true);
+        expect(body?.config?.player_type).toBe('random_bot');
+        expect(body?.config?.agent_type).toBe('heuristic_bot');
+        return jsonResponse(autoPlayPayload);
+      }
+      return jsonResponse({ status: 'ended' });
+    });
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    render(<App />);
+    const readyText = await screen.findByText(/Ready/);
+    expect(readyText).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/You/), { target: { value: 'random_bot' } });
+    fireEvent.change(screen.getByLabelText(/Opponent/), { target: { value: 'heuristic_bot' } });
+    fireEvent.click(screen.getByLabelText(/Auto-play/));
+
+    const startBtn = screen.getByRole('button', { name: /^Start Game$/i });
+    fireEvent.click(startBtn);
+
+    await screen.findByText(/Auto-play completed/);
+    expect(screen.getByText(/You won/i)).toBeInTheDocument();
+    const agentBoardCells = screen.getAllByRole('button', { name: /Agent Board/ });
+    expect(agentBoardCells.some((c) => c.className.includes('hit') || c.className.includes('miss'))).toBe(true);
+  });
+
+  it('blocks auto-play when a human is selected', async () => {
+    const fetchMock = makeFetcher((url) => {
+      if (url.includes('/health/ready')) return jsonResponse({ status: 'ready', model_version: 'v', model_hash: 'h', device: 'cpu' });
+      return jsonResponse(startPayload);
+    });
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    render(<App />);
+    await screen.findByText(/Ready/);
+    fireEvent.click(screen.getByLabelText(/Auto-play/));
+
+    const startBtn = screen.getByRole('button', { name: /^Start Game$/i });
+    fireEvent.click(startBtn);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Auto-play requires both players/);
   });
 
   it('shows backoff guidance on 429', async () => {

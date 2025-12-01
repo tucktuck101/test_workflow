@@ -6,6 +6,7 @@ import type {
   ErrorResponse,
   ReadyResponse,
   ApiError,
+  PlayerType,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -33,11 +34,16 @@ export async function fetchReadiness(): Promise<ReadyResponse> {
   return handle<ReadyResponse>(res);
 }
 
-export async function startGame(placements?: { placements: { name: string; coordinates: number[][] }[] }): Promise<GameStartResponse> {
+type GameConfigPayload = {
+  placements?: { name: string; coordinates: number[][] }[];
+  config?: { player_type: PlayerType; agent_type: PlayerType; auto_play: boolean };
+};
+
+export async function startGame(payload?: GameConfigPayload): Promise<GameStartResponse> {
   const res = await fetch(buildUrl('/api/games'), {
     method: 'POST',
-    headers: placements ? { 'Content-Type': 'application/json' } : undefined,
-    body: placements ? JSON.stringify(placements) : undefined,
+    headers: { 'Content-Type': 'application/json' },
+    body: payload ? JSON.stringify(payload) : '{}',
   });
   return handle<GameStartResponse>(res);
 }
@@ -69,6 +75,7 @@ export function mapError(err: ApiError): { tone: 'error' | 'warn'; message: stri
     model_not_ready: 'Model not ready yet.',
     inference_failed: 'Agent move failed.',
     no_available_moves: 'No moves remain.',
+    invalid_payload: 'Request was invalid.',
     path_invalid: 'Model path invalid.',
     hash_mismatch: 'Model hash mismatch.',
     path_outside_root: 'Model path outside allowed root.',

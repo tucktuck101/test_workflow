@@ -1,5 +1,7 @@
 export type GameStatus = 'in_progress' | 'player_won' | 'agent_won' | 'quit' | 'aborted';
 
+export type PlayerType = 'human' | 'random_bot' | 'heuristic_bot' | 'dqn_agent';
+
 export type CellState = 'unknown' | 'miss' | 'hit' | 'sunk' | 'ship';
 
 export interface GameStartResponse {
@@ -7,8 +9,11 @@ export interface GameStartResponse {
   board: CellState[][];
   agent_board_masked: CellState[][];
   status: GameStatus;
-  model_version: string;
-  model_hash: string;
+  model_version?: string;
+  model_hash?: string;
+  player_type?: PlayerType;
+  agent_type?: PlayerType;
+  auto_play?: boolean;
 }
 
 export interface MoveRequest {
@@ -38,6 +43,7 @@ export type ErrorCode =
   | 'model_not_ready'
   | 'inference_failed'
   | 'no_available_moves'
+  | 'invalid_payload'
   | 'path_invalid'
   | 'hash_mismatch'
   | 'path_outside_root';
