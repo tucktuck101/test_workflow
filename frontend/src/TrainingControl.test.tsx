@@ -9,9 +9,15 @@ const canceledResponse = { run_id: 'r1', status: 'canceled', config: {} };
 describe('TrainingControl', () => {
   it('starts a training run with YAML config', async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.endsWith('/api/training/runs')) return new Response(JSON.stringify(runResponse), { status: 200 });
-      if (url.endsWith('/api/training/runs/r1')) return new Response(JSON.stringify(runningResponse), { status: 200 });
-      if (url.endsWith('/api/training/runs/r1/metrics')) return new Response(JSON.stringify({ run_id: 'r1', metrics: { win_rate: 0.5, episodes: 10 } }), { status: 200 });
+      if (url.endsWith('/api/training/runs'))
+        return new Response(JSON.stringify(runResponse), { status: 200 });
+      if (url.endsWith('/api/training/runs/r1'))
+        return new Response(JSON.stringify(runningResponse), { status: 200 });
+      if (url.endsWith('/api/training/runs/r1/metrics'))
+        return new Response(
+          JSON.stringify({ run_id: 'r1', metrics: { win_rate: 0.5, episodes: 10 } }),
+          { status: 200 }
+        );
       return new Response('{}', { status: 200 });
     });
     vi.stubGlobal('fetch', fetchMock as any);
@@ -34,9 +40,12 @@ describe('TrainingControl', () => {
 
   it('can cancel a run', async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url.endsWith('/api/training/runs')) return new Response(JSON.stringify(runResponse), { status: 200 });
-      if (url.endsWith('/api/training/runs/r1/cancel')) return new Response(JSON.stringify(canceledResponse), { status: 200 });
-      if (url.endsWith('/api/training/runs/r1/metrics')) return new Response(JSON.stringify({ run_id: 'r1', metrics: {} }), { status: 200 });
+      if (url.endsWith('/api/training/runs'))
+        return new Response(JSON.stringify(runResponse), { status: 200 });
+      if (url.endsWith('/api/training/runs/r1/cancel'))
+        return new Response(JSON.stringify(canceledResponse), { status: 200 });
+      if (url.endsWith('/api/training/runs/r1/metrics'))
+        return new Response(JSON.stringify({ run_id: 'r1', metrics: {} }), { status: 200 });
       return new Response(JSON.stringify(runningResponse), { status: 200 });
     });
     vi.stubGlobal('fetch', fetchMock as any);

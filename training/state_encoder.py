@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional
 
 from .env import BattleshipEnv, Coordinate
 
@@ -111,7 +111,12 @@ def encode_state(
         cluster_idx = channel_offset
         for hx, hy in hits:
             for nx, ny in _neighbors((hx, hy)):
-                if 0 <= nx < size and 0 <= ny < size and (nx, ny) not in hits and (nx, ny) not in misses:
+                if (
+                    0 <= nx < size
+                    and 0 <= ny < size
+                    and (nx, ny) not in hits
+                    and (nx, ny) not in misses
+                ):
                     grid[cluster_idx][ny][nx] = 1.0
 
     action_mask = []
@@ -121,7 +126,9 @@ def encode_state(
 
     scalars = [move_fraction, remaining_fraction]
 
-    return EncodedState(grid=grid, action_mask=action_mask, scalars=scalars, channel_names=channel_names)
+    return EncodedState(
+        grid=grid, action_mask=action_mask, scalars=scalars, channel_names=channel_names
+    )
 
 
 def encode_state_np(
@@ -140,8 +147,8 @@ def encode_state_np(
     unknown = ~(hits | misses)
     channel_list = [
         unknown.astype(np.float32),  # agent_unknown
-        misses.astype(np.float32),   # agent_miss
-        hits.astype(np.float32),     # agent_hit
+        misses.astype(np.float32),  # agent_miss
+        hits.astype(np.float32),  # agent_hit
         np.zeros_like(hits, dtype=np.float32),  # last_player_shot
         np.zeros_like(hits, dtype=np.float32),  # last_agent_shot
     ]
@@ -157,7 +164,7 @@ def encode_state_np(
     if include_hit_cluster:
         cluster = np.zeros_like(hits, dtype=np.float32)
         ys, xs = np.nonzero(hits)
-        for x, y in zip(xs, ys):
+        for x, y in zip(xs, ys, strict=False):
             for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
                 if 0 <= nx < size and 0 <= ny < size and unknown[ny, nx]:
                     cluster[ny, nx] = 1.0

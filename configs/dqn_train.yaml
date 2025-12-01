@@ -48,6 +48,5 @@ selfplay:
   rollout_workers: 4
   batch_size: 1
   move_gate: null
-
 # Optional scripted opponent for eval/baseline; omit or set to null to use self-play snapshot
 # opponent: probability

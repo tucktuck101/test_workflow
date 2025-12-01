@@ -43,14 +43,16 @@ class BattleshipEnv:
     def reset(self) -> None:
         self.agent_board, self.ship_cells, self.cell_to_ship = self._place_ships()
         self.ship_remaining = [len(cells) for cells in self.ship_cells]
-        self.hits = set()
-        self.misses = set()
+        self.hits: set[Coordinate] = set()
+        self.misses: set[Coordinate] = set()
         self.remaining = sum(size for _, size in self.ships)
         self.moves_taken = 0
 
     def _neighbors(self, coord: Coordinate) -> List[Coordinate]:
         x, y = coord
-        return [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if not (dx == 0 and dy == 0)]
+        return [
+            (x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if not (dx == 0 and dy == 0)
+        ]
 
     def _place_ships(self) -> Tuple[List[Coordinate], List[set], dict]:
         coords: List[Coordinate] = []
@@ -63,7 +65,9 @@ class BattleshipEnv:
             while not placed:
                 attempts += 1
                 if attempts > 5000:
-                    raise ValueError("Failed to place ships with current constraints; try a larger board or allow adjacency.")
+                    raise ValueError(
+                        "Failed to place ships with current constraints; try a larger board or allow adjacency."
+                    )
                 vertical = self.rng.choice([True, False])
                 if vertical:
                     x = self.rng.randint(0, self.board_size - 1)
@@ -75,7 +79,9 @@ class BattleshipEnv:
                     ship_coords = [(x + i, y) for i in range(size)]
                 if any(c in occupied for c in ship_coords):
                     continue
-                if not self.allow_adjacent and any(n in occupied for coord in ship_coords for n in self._neighbors(coord)):
+                if not self.allow_adjacent and any(
+                    n in occupied for coord in ship_coords for n in self._neighbors(coord)
+                ):
                     continue
                 coords.extend(ship_coords)
                 occupied.update(ship_coords)
@@ -116,7 +122,12 @@ class BattleshipEnv:
             if self.remaining == 0:
                 decay = 0.0
                 if self.reward_win_decay_k > 0:
-                    decay = max(0.0, 1 - max(0, self.moves_taken - self.reward_perfect_move) / self.reward_win_decay_k)
+                    decay = max(
+                        0.0,
+                        1
+                        - max(0, self.moves_taken - self.reward_perfect_move)
+                        / self.reward_win_decay_k,
+                    )
                 reward += self.reward_win_max * decay
                 done = True
         else:

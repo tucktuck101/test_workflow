@@ -1,9 +1,6 @@
 import random
 
-import numpy as np
-
 from bots.scripted_opponents import HuntTargetBot, ProbabilityBot, random_bot_action
-
 
 BOARD_SIZE = 10
 

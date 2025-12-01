@@ -1,7 +1,6 @@
 import hashlib
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
@@ -166,8 +165,10 @@ def test_readiness_path_invalid(tmp_path):
 
 
 def test_readiness_hash_compute_failure(monkeypatch, tmp_path):
-    expected_hash = _prepare_env(monkeypatch, tmp_path)
-    monkeypatch.setattr("app.health._sha256_file", lambda _: (_ for _ in ()).throw(ValueError("boom")))
+    _prepare_env(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        "app.health._sha256_file", lambda _: (_ for _ in ()).throw(ValueError("boom"))
+    )
     settings = Settings.from_env()
     app = create_app(settings)
     client = TestClient(app)

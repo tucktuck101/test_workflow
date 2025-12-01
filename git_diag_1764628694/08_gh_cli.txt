@@ -13,7 +13,7 @@ auth_exit_code=0
 
 ## gh repo view (current repo)
 name:	tucktuck101/test_workflow
-description:	
+description:
 --
 # Coding Agent Workflow — Battleship RL MVP
 

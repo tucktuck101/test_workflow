@@ -24,7 +24,9 @@ def test_create_app_adds_cors_when_origin_set(tmp_path):
         max_active_games=5,
     )
     app = create_app(settings)
-    assert any(isinstance(middleware.cls, CORSMiddleware.__class__) for middleware in app.user_middleware)
+    assert any(
+        isinstance(middleware.cls, CORSMiddleware.__class__) for middleware in app.user_middleware
+    )
 
 
 def test_create_app_without_cors(tmp_path):
@@ -46,7 +48,9 @@ def test_create_app_without_cors(tmp_path):
         max_active_games=5,
     )
     app = create_app(settings)
-    assert not any(isinstance(middleware.cls, CORSMiddleware.__class__) for middleware in app.user_middleware)
+    assert not any(
+        isinstance(middleware.cls, CORSMiddleware.__class__) for middleware in app.user_middleware
+    )
 
 
 def test_cors_allows_preflight(tmp_path):
@@ -69,5 +73,8 @@ def test_cors_allows_preflight(tmp_path):
     )
     app = create_app(settings)
     client = TestClient(app)
-    resp = client.options("/health/live", headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"})
+    resp = client.options(
+        "/health/live",
+        headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"},
+    )
     assert resp.status_code == 200

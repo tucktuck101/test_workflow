@@ -32,8 +32,8 @@ class ModelLoader:
             return
         try:
             self.model_path.resolve().relative_to(self.model_root.resolve())
-        except Exception:
-            raise ValueError("path_outside_root")
+        except Exception as exc:
+            raise ValueError("path_outside_root") from exc
 
     def _validate_path(self) -> None:
         if not self.model_path.exists():

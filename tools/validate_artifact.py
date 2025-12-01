@@ -5,6 +5,7 @@ Usage:
 
 Returns exit code 0 on success; non-zero on validation failure. Prints JSON result.
 """
+
 import argparse
 import json
 import sys

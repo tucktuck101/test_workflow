@@ -1,5 +1,3 @@
-import time
-
 from app.engine import InMemorySessionStore
 
 

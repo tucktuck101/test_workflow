@@ -1,14 +1,22 @@
 import json
 from pathlib import Path
 
-from training.config import TrainConfig
-from training.env import BattleshipEnv
-from training.trainer import run_training, sha256_bytes
-from training.eval import evaluate as eval_policy
-from training.selfplay_trainer import run_selfplay, SelfPlayConfig
-from training.dqn_selfplay import run_dqn_selfplay, DQNConfig as DQNSelfCfg, SelfPlayConfig as DQNSelfPlayCfg
 from tools.validate_artifact import main as validate_main
+from training.config import TrainConfig
+from training.dqn_selfplay import (
+    DQNConfig as DQNSelfCfg,
+)
+from training.dqn_selfplay import (
+    SelfPlayConfig as DQNSelfPlayCfg,
+)
+from training.dqn_selfplay import (
+    run_dqn_selfplay,
+)
+from training.env import BattleshipEnv
+from training.eval import evaluate as eval_policy
+from training.selfplay_trainer import SelfPlayConfig, run_selfplay
 from training.state_encoder import encode_state
+from training.trainer import run_training, sha256_bytes
 
 
 def test_training_deterministic(tmp_path: Path):
@@ -220,7 +228,13 @@ def test_state_encoder_shapes():
     env.hits = {(0, 0)}
     env.misses = {(1, 1)}
     env.moves_taken = 2
-    encoded = encode_state(env, last_player_shot=(0, 0), last_agent_shot=(1, 2), include_self=False, include_hit_cluster=True)
+    encoded = encode_state(
+        env,
+        last_player_shot=(0, 0),
+        last_agent_shot=(1, 2),
+        include_self=False,
+        include_hit_cluster=True,
+    )
     # channels: 5 base + hit_cluster
     assert len(encoded.grid) == 6
     assert len(encoded.grid[0]) == 3 and len(encoded.grid[0][0]) == 3

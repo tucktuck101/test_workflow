@@ -1,13 +1,14 @@
 import json
 import random
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 
-from .engine import GameSession, InvalidMove, _check_bounds, SHIP_SET
-from training.state_encoder import encode_state
 from training.env import BattleshipEnv
+from training.state_encoder import encode_state
+
+from .engine import SHIP_SET, GameSession, InvalidMove
 
 Coordinate = Tuple[int, int]
 
@@ -44,10 +45,14 @@ class AgentAdapter:
         except Exception:
             self._dqn = None
 
-    def _encode_session_state(self, session: GameSession) -> Tuple[torch.Tensor, List[int]]:
+    def _encode_session_state(self, session: GameSession) -> Tuple[np.ndarray, List[int]]:
         # Build hits/misses from player's perspective (shots on agent)
-        hits = {coord for coord, outcome in session.agent_board_hits.items() if outcome.value != "miss"}
-        misses = {coord for coord, outcome in session.agent_board_hits.items() if outcome.value == "miss"}
+        hits = {
+            coord for coord, outcome in session.agent_board_hits.items() if outcome.value != "miss"
+        }
+        misses = {
+            coord for coord, outcome in session.agent_board_hits.items() if outcome.value == "miss"
+        }
         last_player_shot = None
         last_agent_shot = None
         for move in reversed(session.move_history):
@@ -75,7 +80,9 @@ class AgentAdapter:
         grid = np.array(encoded.grid, dtype=np.float32)
         return grid, encoded.action_mask
 
-    def _dqn_forward(self, grid: np.ndarray, weights: dict, mask: List[int], board_size: int) -> Coordinate:
+    def _dqn_forward(
+        self, grid: np.ndarray, weights: dict, mask: List[int], board_size: int
+    ) -> Coordinate:
         x = grid.reshape(1, -1)
         w1, b1 = weights["w1"], weights["b1"]
         w2, b2 = weights["w2"], weights["b2"]
@@ -96,8 +103,14 @@ class AgentAdapter:
         idx = int(np.argmax(q))
         return (idx % board_size, idx // board_size)
 
-    def next_move(self, session: GameSession) -> Coordinate:
-        tried = set(session.player_board_hits.keys())
+    def next_move(
+        self, session: GameSession, target: Literal["player", "agent"] = "player"
+    ) -> Coordinate:
+        tried = (
+            set(session.agent_board_hits.keys())
+            if target == "agent"
+            else set(session.player_board_hits.keys())
+        )
         actions = [
             (x, y)
             for x in range(session.board_size)

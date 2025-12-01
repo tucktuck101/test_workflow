@@ -21,11 +21,10 @@ async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as Partial<ErrorResponse>;
     const detail = body.detail as ApiError | undefined;
-    const error: ApiError =
-      detail || {
-        error_code: 'model_not_ready',
-        message: 'Unexpected error',
-      };
+    const error: ApiError = detail || {
+      error_code: 'model_not_ready',
+      message: 'Unexpected error',
+    };
     throw error;
   }
   return res.json() as Promise<T>;

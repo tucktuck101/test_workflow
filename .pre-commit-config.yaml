@@ -13,7 +13,7 @@ repos:
     rev: v2.2.6
     hooks:
       - id: codespell
-        args: ['-L', 'fo,nd'] # adjust whitelist as needed
+        args: ['-L', 'fo,nd', '--skip=*.lock,package-lock.json,*/package-lock.json']
   - repo: https://github.com/psf/black
     rev: 24.10.0
     hooks:
@@ -23,7 +23,6 @@ repos:
     rev: v0.6.7
     hooks:
       - id: ruff
-      - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:

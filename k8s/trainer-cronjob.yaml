@@ -3,7 +3,7 @@ kind: CronJob
 metadata:
   name: battleship-trainer
 spec:
-  schedule: "0 3 * * *"
+  schedule: '0 3 * * *'
   jobTemplate:
     spec:
       template:
@@ -19,22 +19,22 @@ spec:
                 - name: TRAIN_ARTIFACT_NAME
                   value: model.bin
                 - name: TRAIN_EPOCHS
-                  value: "200"
+                  value: '200'
                 - name: TRAIN_SEED
-                  value: "2"
+                  value: '2'
                 - name: TRAIN_DEVICE
                   value: cpu
                 - name: TRAIN_BOARD_SIZE
-                  value: "10"
+                  value: '10'
                 - name: TRAIN_ALLOW_ADJACENT
-                  value: "true"
+                  value: 'true'
               volumeMounts:
                 - name: artifacts
                   mountPath: /artifacts
                 - name: configs
                   mountPath: /configs
                   readOnly: true
-              command: ["python", "-m", "training.trainer"]
+              command: ['python', '-m', 'training.trainer']
           volumes:
             - name: artifacts
               persistentVolumeClaim:

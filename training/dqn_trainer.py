@@ -9,7 +9,7 @@ from typing import Deque, List, Optional, Tuple
 import numpy as np
 
 from training.config import TrainConfig
-from training.env import BattleshipEnv, DEFAULT_SHIPS
+from training.env import DEFAULT_SHIPS, BattleshipEnv
 from training.state_encoder import encode_state
 from training.trainer import sha256_bytes
 
@@ -87,7 +87,7 @@ class ReplayBuffer:
         import random
 
         batch = random.sample(self.buffer, batch_size)
-        return map(list, zip(*batch))
+        return map(list, zip(*batch, strict=False))
 
     def __len__(self):
         return len(self.buffer)
@@ -176,7 +176,9 @@ class NumpyDQN:
         cache = {"x_pad": x_pad}
         return out, cache
 
-    def _conv2d_backward(self, grad_out: np.ndarray, x_pad: np.ndarray, weight: np.ndarray, padding: int = 1):
+    def _conv2d_backward(
+        self, grad_out: np.ndarray, x_pad: np.ndarray, weight: np.ndarray, padding: int = 1
+    ):
         batch, out_channels, h, w_in = grad_out.shape
         _, in_channels, k, _ = weight.shape
         grad_x_pad = np.zeros_like(x_pad)
@@ -258,9 +260,17 @@ class NumpyDQN:
                 "conv_channels": np.array(self.conv_channels),
             }
         else:
-            params = {"w1": self.w1, "b1": self.b1, "w2": self.w2, "b2": self.b2, "model_type": self.model_type}
+            params = {
+                "w1": self.w1,
+                "b1": self.b1,
+                "w2": self.w2,
+                "b2": self.b2,
+                "model_type": self.model_type,
+            }
         if self.use_dueling:
-            params.update({"wv": self.wv, "bv": self.bv, "wa": self.wa, "ba": self.ba, "use_dueling": True})
+            params.update(
+                {"wv": self.wv, "bv": self.bv, "wa": self.wa, "ba": self.ba, "use_dueling": True}
+            )
         else:
             params.update({"w3": self.w3, "b3": self.b3, "use_dueling": False})
         return params
@@ -276,7 +286,9 @@ def relu_backward(grad: np.ndarray, z: np.ndarray) -> np.ndarray:
     return g
 
 
-def encode_env_state(env: BattleshipEnv, last_action: Optional[Coordinate]) -> Tuple[np.ndarray, List[int]]:
+def encode_env_state(
+    env: BattleshipEnv, last_action: Optional[Coordinate]
+) -> Tuple[np.ndarray, List[int]]:
     encoded = encode_state(env, last_player_shot=last_action, include_hit_cluster=True)
     grid = np.array(encoded.grid, dtype=np.float32)
     return grid, encoded.action_mask
@@ -341,12 +353,18 @@ def train_step(
         forward_states = state_arr
         forward_next_states = next_state_arr
 
-    q_vals, cache = q_net.forward(forward_states, board_size=board_size if q_net.model_type == "cnn" else None)
+    q_vals, cache = q_net.forward(
+        forward_states, board_size=board_size if q_net.model_type == "cnn" else None
+    )
     idx = actions[:, 1] * board_size + actions[:, 0]
     chosen_q = q_vals[range(len(states)), idx]
 
-    next_q_online, _ = q_net.forward(forward_next_states, board_size=board_size if q_net.model_type == "cnn" else None)
-    next_q_target, _ = target_net.forward(forward_next_states, board_size=board_size if q_net.model_type == "cnn" else None)
+    next_q_online, _ = q_net.forward(
+        forward_next_states, board_size=board_size if q_net.model_type == "cnn" else None
+    )
+    next_q_target, _ = target_net.forward(
+        forward_next_states, board_size=board_size if q_net.model_type == "cnn" else None
+    )
     next_q_online = next_q_online.reshape(len(states), -1)
     next_q_target = next_q_target.reshape(len(states), -1)
     next_q_online = np.where(masks_arr, next_q_online, -1e9)
@@ -400,11 +418,15 @@ def train_step(
 
         grad_h2 = grad_flat.reshape(cache["h2"].shape)
         grad_h2 = relu_backward(grad_h2, cache["conv2_out"])
-        grad_h1, grad_conv2, grad_conv2_b = q_net._conv2d_backward(grad_h2, cache["conv2"]["x_pad"], q_net.conv2, padding=1)
+        grad_h1, grad_conv2, grad_conv2_b = q_net._conv2d_backward(
+            grad_h2, cache["conv2"]["x_pad"], q_net.conv2, padding=1
+        )
         grad_tensors.extend([grad_conv2, grad_conv2_b])
 
         grad_h1 = relu_backward(grad_h1, cache["conv1_out"])
-        grad_input, grad_conv1, grad_conv1_b = q_net._conv2d_backward(grad_h1, cache["conv1"]["x_pad"], q_net.conv1, padding=1)
+        grad_input, grad_conv1, grad_conv1_b = q_net._conv2d_backward(
+            grad_h1, cache["conv1"]["x_pad"], q_net.conv1, padding=1
+        )
         grad_tensors.extend([grad_conv1, grad_conv1_b])
 
         _clip_gradients(grad_tensors, clip_norm)
@@ -567,7 +589,12 @@ def run_dqn_training(cfg: TrainConfig, dqn_cfg: DQNConfig) -> dict:
     }
     manifest_path = cfg.output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
-    return {"artifact": str(artifact_path), "manifest": str(manifest_path), "hash": digest, "version": cfg.version}
+    return {
+        "artifact": str(artifact_path),
+        "manifest": str(manifest_path),
+        "hash": digest,
+        "version": cfg.version,
+    }
 
 
 def main() -> None:

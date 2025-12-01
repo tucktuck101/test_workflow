@@ -17,16 +17,16 @@ class GameStatus(str, enum.Enum):
 
 
 class PlayerType(str, enum.Enum):
-    HUMAN = "human"
-    RANDOM_BOT = "random_bot"
-    HEURISTIC_BOT = "heuristic_bot"
-    DQN_AGENT = "dqn_agent"
+    human = "human"
+    random_bot = "random_bot"
+    heuristic_bot = "heuristic_bot"
+    dqn_agent = "dqn_agent"
 
 
 @dataclass
 class GameConfig:
-    player_type: PlayerType = PlayerType.HUMAN
-    agent_type: PlayerType = PlayerType.DQN_AGENT
+    player_type: PlayerType = PlayerType.human
+    agent_type: PlayerType = PlayerType.dqn_agent
     auto_play: bool = False
 
 
@@ -112,7 +112,9 @@ def _place_ships(board_size: int, rng: random.Random, *, allow_adjacent: bool = 
                 coords = [(x + i, y) for i in range(size)]
             if any(c in occupied for c in coords):
                 continue
-            if not allow_adjacent and any(n in occupied for coord in coords for n in _neighbors(coord)):
+            if not allow_adjacent and any(
+                n in occupied for coord in coords for n in _neighbors(coord)
+            ):
                 continue
             occupied.update(coords)
             ships.append(Ship(name=name, size=size, coordinates=coords))
@@ -143,7 +145,9 @@ def _check_linearity(size: int, coords: List[Coordinate]) -> None:
             raise InvalidMove("invalid_coordinates")
 
 
-def validate_placements(board_size: int, placements: List[Ship], *, allow_adjacent: bool = True) -> None:
+def validate_placements(
+    board_size: int, placements: List[Ship], *, allow_adjacent: bool = True
+) -> None:
     occupied = set()
     expected = {name: size for name, size in SHIP_SET}
     if len(placements) != len(expected):
@@ -168,7 +172,9 @@ def validate_placements(board_size: int, placements: List[Ship], *, allow_adjace
         raise InvalidMove("invalid_coordinates")
 
 
-def create_session(board_size: int, deterministic_seed: Optional[int] = None, config: GameConfig | None = None) -> GameSession:
+def create_session(
+    board_size: int, deterministic_seed: Optional[int] = None, config: GameConfig | None = None
+) -> GameSession:
     rng = random.Random(deterministic_seed)
     player_ships = _place_ships(board_size, rng)
     agent_ships = _place_ships(board_size, rng)
@@ -182,7 +188,12 @@ def create_session(board_size: int, deterministic_seed: Optional[int] = None, co
     )
 
 
-def create_session_with_player(board_size: int, placements: List[Ship], deterministic_seed: Optional[int] = None, config: GameConfig | None = None) -> GameSession:
+def create_session_with_player(
+    board_size: int,
+    placements: List[Ship],
+    deterministic_seed: Optional[int] = None,
+    config: GameConfig | None = None,
+) -> GameSession:
     rng = random.Random(deterministic_seed)
     agent_ships = _place_ships(board_size, rng)
     return GameSession(
@@ -239,7 +250,9 @@ def apply_player_move(session: GameSession, coord: Coordinate) -> Dict:
 
 def apply_agent_move(session: GameSession, coord: Coordinate) -> Dict:
     """Apply an agent move against the player's board."""
-    result = _register_move(session, "agent", session.player_ships, session.player_board_hits, coord)
+    result = _register_move(
+        session, "agent", session.player_ships, session.player_board_hits, coord
+    )
     if all(ship.is_sunk for ship in session.player_ships):
         session.status = GameStatus.AGENT_WON
     return result
@@ -252,14 +265,21 @@ def quit_game(session: GameSession) -> None:
 class InMemorySessionStore:
     """Soft-cap in-memory session store with TTL support."""
 
-    def __init__(self, max_active_games: Optional[int] = None, ttl_seconds: Optional[int] = None) -> None:
+    def __init__(
+        self, max_active_games: Optional[int] = None, ttl_seconds: Optional[int] = None
+    ) -> None:
         self._sessions: Dict[str, GameSession] = {}
         self._ended_ids: set[str] = set()
         self._max = max_active_games
         self._ttl = ttl_seconds
         self._created_at: Dict[str, float] = {}
 
-    def create(self, board_size: int, deterministic_seed: Optional[int] = None, config: GameConfig | None = None) -> GameSession:
+    def create(
+        self,
+        board_size: int,
+        deterministic_seed: Optional[int] = None,
+        config: GameConfig | None = None,
+    ) -> GameSession:
         if self._max is not None and len(self._sessions) >= self._max:
             raise InvalidMove("capacity_exceeded")
         session = create_session(board_size, deterministic_seed, config=config)

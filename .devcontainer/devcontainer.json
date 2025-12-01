@@ -13,11 +13,7 @@
         "python.defaultInterpreterPath": ".venv/bin/python",
         "editor.formatOnSave": true
       },
-      "extensions": [
-        "ms-python.python",
-        "ms-python.vscode-pylance",
-        "dbaeumer.vscode-eslint"
-      ]
+      "extensions": ["ms-python.python", "ms-python.vscode-pylance", "dbaeumer.vscode-eslint"]
     }
   }
 }

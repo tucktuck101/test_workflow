@@ -48,7 +48,8 @@ interface LogEntry {
   message: string;
 }
 
-const emptyBoard = (size: number): CellState[][] => Array.from({ length: size }, () => Array.from({ length: size }, () => 'unknown' as CellState));
+const emptyBoard = (size: number): CellState[][] =>
+  Array.from({ length: size }, () => Array.from({ length: size }, () => 'unknown' as CellState));
 
 const statusCopy: Record<GameStatus | 'ready', string> = {
   ready: 'Ready to start',
@@ -59,8 +60,9 @@ const statusCopy: Record<GameStatus | 'ready', string> = {
   aborted: 'Aborted',
 };
 
-const isReady = (val: ReadyResponse | { status: 'checking' | 'error'; reason?: string }): val is ReadyResponse =>
-  val.status === 'ready';
+const isReady = (
+  val: ReadyResponse | { status: 'checking' | 'error'; reason?: string }
+): val is ReadyResponse => val.status === 'ready';
 
 const SHIPS = [
   { name: 'Carrier', size: 5 },
@@ -83,7 +85,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [moveLoading, setMoveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [readiness, setReadiness] = useState<ReadyResponse | { status: 'checking' | 'error'; reason?: string }>({ status: 'checking' });
+  const [readiness, setReadiness] = useState<
+    ReadyResponse | { status: 'checking' | 'error'; reason?: string }
+  >({ status: 'checking' });
   const [modelMeta, setModelMeta] = useState<{ version?: string; hash?: string }>({});
   const [placementMode, setPlacementMode] = useState(false);
   const [placementMap, setPlacementMap] = useState<Record<string, number[][]>>({});
@@ -105,7 +109,8 @@ function App() {
 
   const readyBadge = useMemo(() => {
     if (readiness.status === 'checking') return { tone: 'loading', text: 'Checking readiness…' };
-    if (readiness.status === 'error') return { tone: 'error', text: readiness.reason || 'Not ready' };
+    if (readiness.status === 'error')
+      return { tone: 'error', text: readiness.reason || 'Not ready' };
     if (isReady(readiness)) return { tone: 'ready', text: `Ready · ${readiness.model_version}` };
     return { tone: 'error', text: 'Not ready' };
   }, [readiness]);
@@ -120,7 +125,9 @@ function App() {
     setAgentBoard(emptyBoard(size));
     setGameId(null);
     setStatus('ready');
-    setLogs([{ tone: 'info', message: 'Placement mode: click a cell to place each ship in order.' }]);
+    setLogs([
+      { tone: 'info', message: 'Placement mode: click a cell to place each ship in order.' },
+    ]);
   }
 
   const playerGrid = useMemo(() => {
@@ -137,8 +144,8 @@ function App() {
   async function handleStart() {
     setError(null);
     if (autoPlay && (playerType === 'human' || agentType === 'human')) {
-        setError('Auto-play requires both players to be bots.');
-        return;
+      setError('Auto-play requires both players to be bots.');
+      return;
     }
     if (playerType !== 'human' && !autoPlay) {
       setError('Non-human players require auto-play enabled.');
@@ -157,7 +164,9 @@ function App() {
     try {
       const placementPayload = buildPlacementsPayload();
       const payload =
-        playerType === 'human' && placementPayload ? { placements: placementPayload.placements } : undefined;
+        playerType === 'human' && placementPayload
+          ? { placements: placementPayload.placements }
+          : undefined;
       const res = await startGame({
         ...(payload || {}),
         config: { player_type: playerType, agent_type: agentType, auto_play: autoPlay },
@@ -170,7 +179,9 @@ function App() {
       setLogs([
         {
           tone: 'info',
-          message: res.auto_play ? `Auto-play completed: ${statusCopy[res.status]} (${res.player_type} vs ${res.agent_type}).` : 'Fleet deployed. Take your shot.',
+          message: res.auto_play
+            ? `Auto-play completed: ${statusCopy[res.status]} (${res.player_type} vs ${res.agent_type}).`
+            : 'Fleet deployed. Take your shot.',
         },
       ]);
       setPlacementMode(false);
@@ -178,7 +189,10 @@ function App() {
     } catch (err: any) {
       const mapped = mapError(err);
       setError(mapped.message);
-      setLogs((prev) => [...prev, { tone: mapped.tone === 'warn' ? 'warn' : 'error', message: mapped.message }]);
+      setLogs((prev) => [
+        ...prev,
+        { tone: mapped.tone === 'warn' ? 'warn' : 'error', message: mapped.message },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -211,7 +225,10 @@ function App() {
     } catch (err: any) {
       const mapped = mapError(err);
       setError(mapped.message);
-      setLogs((prev) => [...prev, { tone: mapped.tone === 'warn' ? 'warn' : 'error', message: mapped.message }]);
+      setLogs((prev) => [
+        ...prev,
+        { tone: mapped.tone === 'warn' ? 'warn' : 'error', message: mapped.message },
+      ]);
       if (err.error_code === 'game_finished') {
         setStatus('quit');
       }
@@ -272,7 +289,10 @@ function App() {
     } catch (err: any) {
       const mapped = mapError(err);
       setError(mapped.message);
-      setLogs((prev) => [...prev, { tone: mapped.tone === 'warn' ? 'warn' : 'error', message: mapped.message }]);
+      setLogs((prev) => [
+        ...prev,
+        { tone: mapped.tone === 'warn' ? 'warn' : 'error', message: mapped.message },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -290,7 +310,9 @@ function App() {
           <div className="title">Battleship vs RL Agent</div>
           <div className="status-line" aria-live="polite">
             Status: <strong>{statusCopy[status]}</strong>
-            {modelMeta.version && <span style={{ color: 'var(--muted)' }}>· Model {modelMeta.version}</span>}
+            {modelMeta.version && (
+              <span style={{ color: 'var(--muted)' }}>· Model {modelMeta.version}</span>
+            )}
           </div>
         </div>
         <span className={`badge ${readyBadge.tone}`}>{readyBadge.text}</span>
@@ -343,7 +365,8 @@ function App() {
           <span style={{ color: 'var(--muted)', fontSize: 14 }}>API: {API_BASE}</span>
         </div>
         <p style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
-          Tip: Auto-play requires both sides to be bots. Human games run turn-by-turn and require placing your fleet first.
+          Tip: Auto-play requires both sides to be bots. Human games run turn-by-turn and require
+          placing your fleet first.
         </p>
         {placementMode && currentShip && (
           <div className="status-line" style={{ marginTop: 10, gap: 12, flexWrap: 'wrap' }}>
@@ -352,7 +375,9 @@ function App() {
             </span>
             <button
               className="button secondary"
-              onClick={() => setOrientation((prev) => (prev === 'horizontal' ? 'vertical' : 'horizontal'))}
+              onClick={() =>
+                setOrientation((prev) => (prev === 'horizontal' ? 'vertical' : 'horizontal'))
+              }
               type="button"
             >
               Orientation: {orientation === 'horizontal' ? 'Horizontal' : 'Vertical'}
@@ -388,44 +413,54 @@ function App() {
         )}
       </div>
 
-        <>
-          <div className="board-wrap" aria-live="polite">
-            <Board
-              grid={playerGrid}
-              label={placementMode ? 'Your Board (place your ships)' : 'Your Board (your fleet)'}
-              disabled={Boolean(gameId) && !placementMode}
-              onCellClick={placementMode ? placeShip : undefined}
-            />
-            <Board
-              grid={agentBoard}
-              label={autoPlay ? 'Agent Board (auto-played)' : 'Agent Board (click to fire)'}
-              disabled={moveDisabled}
-              onCellClick={autoPlay ? undefined : handleMove}
-            />
-          </div>
+      <>
+        <div className="board-wrap" aria-live="polite">
+          <Board
+            grid={playerGrid}
+            label={placementMode ? 'Your Board (place your ships)' : 'Your Board (your fleet)'}
+            disabled={Boolean(gameId) && !placementMode}
+            onCellClick={placementMode ? placeShip : undefined}
+          />
+          <Board
+            grid={agentBoard}
+            label={autoPlay ? 'Agent Board (auto-played)' : 'Agent Board (click to fire)'}
+            disabled={moveDisabled}
+            onCellClick={autoPlay ? undefined : handleMove}
+          />
+        </div>
 
-          <div className="card" style={{ marginTop: 16 }}>
-            <div className="status-line" style={{ marginBottom: 8 }}>
-              <strong>Event log</strong>
-            </div>
-            <div className="log" aria-live="polite">
-              {logs.length === 0 && <div className="message warn">No actions yet.</div>}
-              {logs.map((entry, idx) => (
-                <div key={idx} className={`message ${entry.tone === 'warn' ? 'warn' : entry.tone}`}>{entry.message}</div>
-              ))}
-            </div>
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="status-line" style={{ marginBottom: 8 }}>
+            <strong>Event log</strong>
           </div>
+          <div className="log" aria-live="polite">
+            {logs.length === 0 && <div className="message warn">No actions yet.</div>}
+            {logs.map((entry, idx) => (
+              <div key={idx} className={`message ${entry.tone === 'warn' ? 'warn' : entry.tone}`}>
+                {entry.message}
+              </div>
+            ))}
+          </div>
+        </div>
 
-          <div className="card" style={{ marginTop: 12 }}>
-            <strong>Player types</strong>
-            <ul style={{ marginTop: 6, paddingLeft: 18, color: 'var(--muted)' }}>
-              <li><strong>Human</strong>: you place ships and fire shots manually.</li>
-              <li><strong>Random Bot</strong>: fires uniformly at unknown cells.</li>
-              <li><strong>Heuristic Bot</strong>: hunt/target strategy that chases hits.</li>
-              <li><strong>DQN Agent</strong>: uses the loaded RL model for moves.</li>
-            </ul>
-          </div>
-        </>
+        <div className="card" style={{ marginTop: 12 }}>
+          <strong>Player types</strong>
+          <ul style={{ marginTop: 6, paddingLeft: 18, color: 'var(--muted)' }}>
+            <li>
+              <strong>Human</strong>: you place ships and fire shots manually.
+            </li>
+            <li>
+              <strong>Random Bot</strong>: fires uniformly at unknown cells.
+            </li>
+            <li>
+              <strong>Heuristic Bot</strong>: hunt/target strategy that chases hits.
+            </li>
+            <li>
+              <strong>DQN Agent</strong>: uses the loaded RL model for moves.
+            </li>
+          </ul>
+        </div>
+      </>
     </div>
   );
 }

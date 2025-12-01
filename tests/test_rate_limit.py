@@ -1,5 +1,5 @@
 import hashlib
-import pytest
+
 from fastapi.testclient import TestClient
 
 from app.config import Settings

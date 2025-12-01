@@ -36,8 +36,6 @@ def _resolve_path(raw: str, name: str) -> Path:
 class Settings:
     api_host: str
     api_port: int
-    frontend_origin: Optional[str]
-    training_frontend_origin: Optional[str]
     model_root: Path
     model_path: Path
     model_version: str
@@ -48,6 +46,8 @@ class Settings:
     observability_enabled: bool
     deterministic_mode: bool
     max_active_games: Optional[int]
+    frontend_origin: Optional[str] = None
+    training_frontend_origin: Optional[str] = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -65,9 +65,7 @@ class Settings:
 
         model_root_raw = env.get("MODEL_ROOT")
         model_root = (
-            _resolve_path(model_root_raw, "MODEL_ROOT")
-            if model_root_raw
-            else model_path.parent
+            _resolve_path(model_root_raw, "MODEL_ROOT") if model_root_raw else model_path.parent
         )
         if model_root not in (model_path, *model_path.parents):
             raise ValueError("MODEL_PATH must be within MODEL_ROOT.")
@@ -93,7 +91,9 @@ class Settings:
         observability_enabled = _parse_bool(
             env.get("OBSERVABILITY_ENABLED", "true"), "OBSERVABILITY_ENABLED"
         )
-        deterministic_mode = _parse_bool(env.get("DETERMINISTIC_MODE", "false"), "DETERMINISTIC_MODE")
+        deterministic_mode = _parse_bool(
+            env.get("DETERMINISTIC_MODE", "false"), "DETERMINISTIC_MODE"
+        )
 
         max_active_games_raw = env.get("MAX_ACTIVE_GAMES", "100")
         max_active_games = _parse_int(max_active_games_raw, "MAX_ACTIVE_GAMES", min_value=1)

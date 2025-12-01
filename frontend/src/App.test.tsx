@@ -6,7 +6,8 @@ type FetchHandler = (url: string, init?: RequestInit) => Response;
 
 const BOARD_SIZE = 10;
 
-const makeBoard = (fill: string) => Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => fill));
+const makeBoard = (fill: string) =>
+  Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => fill));
 
 const startPayload = {
   game_id: 'g-1',
@@ -67,7 +68,9 @@ function placeFleet() {
     [0, 4], // Destroyer (2)
   ];
   anchors.forEach(([x, y]) => {
-    const cell = screen.getByLabelText(new RegExp(`Your Board \\(place your ships\\) cell ${x},${y} \\(unknown\\)`, 'i'));
+    const cell = screen.getByLabelText(
+      new RegExp(`Your Board \\(place your ships\\) cell ${x},${y} \\(unknown\\)`, 'i')
+    );
     fireEvent.click(cell);
   });
 }
@@ -79,7 +82,13 @@ beforeEach(() => {
 describe('App', () => {
   it('renders readiness badge when ready', async () => {
     const fetchMock = makeFetcher((url) => {
-      if (url.includes('/health/ready')) return jsonResponse({ status: 'ready', model_version: 'v', model_hash: 'h', device: 'cpu' });
+      if (url.includes('/health/ready'))
+        return jsonResponse({
+          status: 'ready',
+          model_version: 'v',
+          model_hash: 'h',
+          device: 'cpu',
+        });
       return jsonResponse(startPayload);
     });
     vi.stubGlobal('fetch', fetchMock as any);
@@ -91,7 +100,13 @@ describe('App', () => {
 
   it('can start and make a move', async () => {
     const fetchMock = makeFetcher((url, init) => {
-      if (url.includes('/health/ready')) return jsonResponse({ status: 'ready', model_version: 'v', model_hash: 'h', device: 'cpu' });
+      if (url.includes('/health/ready'))
+        return jsonResponse({
+          status: 'ready',
+          model_version: 'v',
+          model_hash: 'h',
+          device: 'cpu',
+        });
       if (url.endsWith('/api/games')) return jsonResponse(startPayload);
       if (url.includes('/moves')) return jsonResponse(movePayload);
       return jsonResponse({ status: 'ended' });
@@ -117,7 +132,13 @@ describe('App', () => {
 
   it('auto-plays bot vs bot and renders outcome', async () => {
     const fetchMock = makeFetcher((url, init) => {
-      if (url.includes('/health/ready')) return jsonResponse({ status: 'ready', model_version: 'v', model_hash: 'h', device: 'cpu' });
+      if (url.includes('/health/ready'))
+        return jsonResponse({
+          status: 'ready',
+          model_version: 'v',
+          model_hash: 'h',
+          device: 'cpu',
+        });
       if (url.endsWith('/api/games')) {
         const body = init?.body ? JSON.parse(init.body.toString()) : {};
         expect(body?.config?.auto_play).toBe(true);
@@ -133,7 +154,7 @@ describe('App', () => {
     const readyText = await screen.findByText(/Ready/);
     expect(readyText).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/You/), { target: { value: 'random_bot' } });
+    fireEvent.change(screen.getByLabelText(/^You$/), { target: { value: 'random_bot' } });
     fireEvent.change(screen.getByLabelText(/Opponent/), { target: { value: 'heuristic_bot' } });
     fireEvent.click(screen.getByLabelText(/Auto-play/));
 
@@ -141,14 +162,22 @@ describe('App', () => {
     fireEvent.click(startBtn);
 
     await screen.findByText(/Auto-play completed/);
-    expect(screen.getByText(/You won/i)).toBeInTheDocument();
+    expect(screen.getByText(/Auto-play completed: You won/i)).toBeInTheDocument();
     const agentBoardCells = screen.getAllByRole('button', { name: /Agent Board/ });
-    expect(agentBoardCells.some((c) => c.className.includes('hit') || c.className.includes('miss'))).toBe(true);
+    expect(
+      agentBoardCells.some((c) => c.className.includes('hit') || c.className.includes('miss'))
+    ).toBe(true);
   });
 
   it('blocks auto-play when a human is selected', async () => {
     const fetchMock = makeFetcher((url) => {
-      if (url.includes('/health/ready')) return jsonResponse({ status: 'ready', model_version: 'v', model_hash: 'h', device: 'cpu' });
+      if (url.includes('/health/ready'))
+        return jsonResponse({
+          status: 'ready',
+          model_version: 'v',
+          model_hash: 'h',
+          device: 'cpu',
+        });
       return jsonResponse(startPayload);
     });
     vi.stubGlobal('fetch', fetchMock as any);
@@ -165,7 +194,13 @@ describe('App', () => {
 
   it('shows backoff guidance on 429', async () => {
     const fetchMock = makeFetcher((url) => {
-      if (url.includes('/health/ready')) return jsonResponse({ status: 'ready', model_version: 'v', model_hash: 'h', device: 'cpu' });
+      if (url.includes('/health/ready'))
+        return jsonResponse({
+          status: 'ready',
+          model_version: 'v',
+          model_hash: 'h',
+          device: 'cpu',
+        });
       if (url.endsWith('/api/games'))
         return jsonResponse({ detail: { error_code: 'rate_limited', message: 'Too many' } }, 429);
       return jsonResponse({});

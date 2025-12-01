@@ -6,8 +6,6 @@ Override with --file <path>.
 """
 
 import argparse
-import glob
-import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -28,8 +26,16 @@ def derive_output_name(csv_path: Path, output: str | None) -> Path | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot DQN self-play metrics")
-    parser.add_argument("--file", type=str, help="Path to metrics CSV (defaults to latest dqn_selfplay_metrics-*.csv in ./artifacts)")
-    parser.add_argument("--output", type=str, help="Optional path to save the plot (png). If omitted, shows interactively.")
+    parser.add_argument(
+        "--file",
+        type=str,
+        help="Path to metrics CSV (defaults to latest dqn_selfplay_metrics-*.csv in ./artifacts)",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        help="Optional path to save the plot (png). If omitted, shows interactively.",
+    )
     args = parser.parse_args()
 
     if args.file:
@@ -37,7 +43,9 @@ def main() -> None:
     else:
         path = find_latest_metrics(Path("artifacts"))
         if not path:
-            raise SystemExit("No metrics file found. Provide --file or ensure artifacts/dqn_selfplay_metrics-*.csv exists.")
+            raise SystemExit(
+                "No metrics file found. Provide --file or ensure artifacts/dqn_selfplay_metrics-*.csv exists."
+            )
 
     df = pd.read_csv(path)
     out_path = derive_output_name(path, args.output)

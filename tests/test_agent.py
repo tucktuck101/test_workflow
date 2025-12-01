@@ -1,5 +1,5 @@
 from app.agent import AgentAdapter
-from app.engine import GameSession, create_session
+from app.engine import create_session
 
 
 def test_agent_deterministic_returns_same_move():

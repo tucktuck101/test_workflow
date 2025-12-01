@@ -62,6 +62,7 @@ def test_start_with_placements(monkeypatch, tmp_path):
     assert body["player_type"] == PlayerType.human.value
     assert body["agent_type"] == PlayerType.dqn_agent.value
 
+
 def test_duplicate_move_returns_400(monkeypatch, tmp_path):
     client = _make_app(monkeypatch, tmp_path)
     game_id = client.post("/api/games").json()["game_id"]
@@ -159,7 +160,9 @@ def test_stepwise_with_random_agent(monkeypatch, tmp_path):
 
 def test_autoplay_dqn_vs_random(monkeypatch, tmp_path):
     client = _make_app(monkeypatch, tmp_path)
-    payload = {"config": {"player_type": "dqn_agent", "agent_type": "random_bot", "auto_play": True}}
+    payload = {
+        "config": {"player_type": "dqn_agent", "agent_type": "random_bot", "auto_play": True}
+    }
     resp = client.post("/api/games", json=payload)
     assert resp.status_code == 200
     data = resp.json()
@@ -169,7 +172,9 @@ def test_autoplay_dqn_vs_random(monkeypatch, tmp_path):
 
 def test_autoplay_random_vs_dqn(monkeypatch, tmp_path):
     client = _make_app(monkeypatch, tmp_path)
-    payload = {"config": {"player_type": "random_bot", "agent_type": "dqn_agent", "auto_play": True}}
+    payload = {
+        "config": {"player_type": "random_bot", "agent_type": "dqn_agent", "auto_play": True}
+    }
     resp = client.post("/api/games", json=payload)
     assert resp.status_code == 200
     data = resp.json()
@@ -179,7 +184,9 @@ def test_autoplay_random_vs_dqn(monkeypatch, tmp_path):
 
 def test_autoplay_heuristic_vs_random(monkeypatch, tmp_path):
     client = _make_app(monkeypatch, tmp_path)
-    payload = {"config": {"player_type": "heuristic_bot", "agent_type": "random_bot", "auto_play": True}}
+    payload = {
+        "config": {"player_type": "heuristic_bot", "agent_type": "random_bot", "auto_play": True}
+    }
     resp = client.post("/api/games", json=payload)
     assert resp.status_code == 200
     assert resp.json()["status"] in {"player_won", "agent_won"}

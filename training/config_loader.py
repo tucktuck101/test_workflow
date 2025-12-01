@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import yaml
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 
 def load_yaml_config(path: str | Path) -> dict[str, Any]:
@@ -26,7 +27,9 @@ def apply_overrides(obj, data: dict[str, Any], key_map: dict[str, str] | None = 
             setattr(obj, f.name, data[key])
 
 
-def validate_yaml_sections(cfg: dict[str, Any], required_sections: list[str], allowed_keys: dict[str, set[str]]) -> None:
+def validate_yaml_sections(
+    cfg: dict[str, Any], required_sections: list[str], allowed_keys: dict[str, set[str]]
+) -> None:
     for section in required_sections:
         if section not in cfg or not isinstance(cfg.get(section), dict):
             raise ValueError(f"Missing or invalid section '{section}' in YAML config")

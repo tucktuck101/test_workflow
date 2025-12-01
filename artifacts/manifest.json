@@ -6,26 +6,11 @@
   "board_size": 10,
   "allow_adjacent": true,
   "ships": [
-    [
-      "Carrier",
-      5
-    ],
-    [
-      "Battleship",
-      4
-    ],
-    [
-      "Cruiser",
-      3
-    ],
-    [
-      "Submarine",
-      3
-    ],
-    [
-      "Destroyer",
-      2
-    ]
+    ["Carrier", 5],
+    ["Battleship", 4],
+    ["Cruiser", 3],
+    ["Submarine", 3],
+    ["Destroyer", 2]
   ],
   "seed": 0,
   "episodes": 10000,

@@ -4,7 +4,6 @@ from typing import Dict, Iterator, Optional
 from opentelemetry import metrics, trace
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from .config import Settings
 

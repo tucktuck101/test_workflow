@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
-from .env import BattleshipEnv, Coordinate, DEFAULT_SHIPS
+from .env import DEFAULT_SHIPS, BattleshipEnv, Coordinate
 
 
 def _load_policy(path: Path) -> Dict[Coordinate, float]:
@@ -30,7 +30,12 @@ def evaluate(
     allow_adjacent: bool = True,
 ) -> Tuple[float, float]:
     policy = _load_policy(policy_path)
-    env = BattleshipEnv(board_size=board_size, seed=seed, ships=ships or list(DEFAULT_SHIPS), allow_adjacent=allow_adjacent)
+    env = BattleshipEnv(
+        board_size=board_size,
+        seed=seed,
+        ships=ships or list(DEFAULT_SHIPS),
+        allow_adjacent=allow_adjacent,
+    )
     total_reward = 0.0
     total_moves = 0
     for _ in range(episodes):
@@ -52,7 +57,12 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--board-size", type=int, default=5)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--disallow-adjacent", dest="allow_adjacent", action="store_false", help="Disallow ships touching (diag/edge)")
+    parser.add_argument(
+        "--disallow-adjacent",
+        dest="allow_adjacent",
+        action="store_false",
+        help="Disallow ships touching (diag/edge)",
+    )
     parser.set_defaults(allow_adjacent=True)
     args = parser.parse_args()
 

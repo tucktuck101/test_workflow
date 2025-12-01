@@ -1,6 +1,6 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json* frontend/tsconfig.json frontend/vite.training.config.ts frontend/training.html frontend/src ./ 
+COPY frontend/package.json frontend/package-lock.json* frontend/tsconfig.json frontend/vite.training.config.ts frontend/training.html frontend/src ./
 RUN npm install && npm run build:training
 
 FROM nginx:alpine

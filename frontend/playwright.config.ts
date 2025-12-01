@@ -8,7 +8,5 @@ export default defineConfig({
     headless: true,
     viewport: { width: 1280, height: 720 },
   },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  ],
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

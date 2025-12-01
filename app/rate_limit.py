@@ -1,8 +1,6 @@
 import time
 from typing import Dict
 
-from .errors import raise_http
-
 
 class RateLimitExceeded(Exception):
     def __init__(self, retry_after: int) -> None:

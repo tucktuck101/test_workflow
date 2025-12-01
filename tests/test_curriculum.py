@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from training.curriculum import DEFAULT_CURRICULUM_PATH, CurriculumConfig, CurriculumState, load_curriculum
+from training.curriculum import (
+    DEFAULT_CURRICULUM_PATH,
+    CurriculumConfig,
+    CurriculumState,
+    load_curriculum,
+)
 
 
 def test_default_curriculum_loads():
@@ -122,7 +127,9 @@ def test_curriculum_state_transitions_and_persistence(tmp_path: Path):
 
 def test_curriculum_state_limits(tmp_path: Path):
     curriculum = _simple_curriculum()
-    state = CurriculumState(curriculum, tmp_path, run_id="r2", max_episodes=2, max_duration_sec=None)
+    state = CurriculumState(
+        curriculum, tmp_path, run_id="r2", max_episodes=2, max_duration_sec=None
+    )
     assert state.limits_reached() is False
     state.record_training(2)
     assert state.limits_reached() is True

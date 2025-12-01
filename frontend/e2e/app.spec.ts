@@ -17,6 +17,9 @@ test('start game flow works', async ({ page }) => {
   await expect(page.getByRole('button', { name: /start/i })).toBeVisible();
   await page.getByRole('button', { name: /start/i }).click();
   await expect(page.getByText(/Game started/i)).toBeVisible();
-  await page.getByRole('button', { name: /cell 0,0/i }).first().click();
+  await page
+    .getByRole('button', { name: /cell 0,0/i })
+    .first()
+    .click();
   await expect(page.getByText(/Agent fired/)).toBeVisible();
 });

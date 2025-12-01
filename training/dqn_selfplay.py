@@ -4,7 +4,7 @@ import math
 import os
 import random
 import sys
-from collections import deque, defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,12 +12,19 @@ from typing import Deque, List, Optional, Tuple
 
 import numpy as np
 
-from training.curriculum import CurriculumConfig, CurriculumState, load_curriculum
 from training.config import TrainConfig
-from training.config_loader import apply_overrides, dataclass_field_names, load_yaml_config, validate_values, validate_yaml_sections
+from training.config_loader import (
+    apply_overrides,
+    dataclass_field_names,
+    load_yaml_config,
+    validate_values,
+    validate_yaml_sections,
+)
+from training.curriculum import CurriculumConfig, CurriculumState, load_curriculum
 from training.env import DEFAULT_SHIPS
 from training.state_encoder import encode_state, encode_state_np
-from training.vectorized_env import VectorEnv, BatchedEnv
+from training.trainer import sha256_bytes
+from training.vectorized_env import BatchedEnv, VectorEnv
 
 
 def rollout_worker_fn(args):
@@ -26,7 +33,6 @@ def rollout_worker_fn(args):
     def clone(val):
         return val.copy() if hasattr(val, "copy") else val
 
-    rng = np.random.default_rng(seed)
     batch_env = BatchedEnv(batch_size=batch_envs, params=env_params, seed=seed)
     model_type = policy_params.get("model_type", "mlp")
     board_size = env_params["board_size"]
@@ -57,7 +63,13 @@ def rollout_worker_fn(args):
     else:
         input_dim = policy_params["w1"].shape[0]
         hidden = policy_params["w1"].shape[1]
-        q = NumpyDQN(input_dim, board_size * board_size, hidden=hidden, use_dueling=use_dueling, model=model_type)
+        q = NumpyDQN(
+            input_dim,
+            board_size * board_size,
+            hidden=hidden,
+            use_dueling=use_dueling,
+            model=model_type,
+        )
         q.w1, q.b1, q.w2, q.b2 = [clone(policy_params[k]) for k in ("w1", "b1", "w2", "b2")]
         if use_dueling:
             q.wv, q.bv, q.wa, q.ba = [clone(policy_params[k]) for k in ("wv", "bv", "wa", "ba")]
@@ -95,7 +107,15 @@ def rollout_worker_fn(args):
                     grids.append(None)
                     masks.append(None)
                     continue
-                grid, mask = encode_state_np(hits, misses, moves_taken, max_moves, last_actions[idx], None, include_hit_cluster=True)
+                grid, mask = encode_state_np(
+                    hits,
+                    misses,
+                    moves_taken,
+                    max_moves,
+                    last_actions[idx],
+                    None,
+                    include_hit_cluster=True,
+                )
                 if bot and bot[0] in {"random", "hunt_target", "probability"}:
                     _, bot_impl = bot
                     if bot[0] == "random":
@@ -115,12 +135,30 @@ def rollout_worker_fn(args):
                 if dones[i]:
                     continue
                 next_hits, next_misses, next_moves, next_max = new_states[i]
-                next_grid, next_mask = encode_state_np(next_hits, next_misses, next_moves, next_max, actions[i], None, include_hit_cluster=True)
-                transitions.append((grids[i], actions[i], rewards[i], next_grid, step_dones[i], masks[i]))
+                next_grid, next_mask = encode_state_np(
+                    next_hits,
+                    next_misses,
+                    next_moves,
+                    next_max,
+                    actions[i],
+                    None,
+                    include_hit_cluster=True,
+                )
+                transitions.append(
+                    (grids[i], actions[i], rewards[i], next_grid, step_dones[i], masks[i])
+                )
                 last_actions[i] = actions[i]
                 # reward breakdown
                 prev_hits, prev_misses, prev_moves, _ = prev_states[i]
-                breakdown = reward_breakdown(batch_env.envs[i], actions[i], rewards[i], step_dones[i], prev_hits, prev_misses, prev_moves)
+                breakdown = reward_breakdown(
+                    batch_env.envs[i],
+                    actions[i],
+                    rewards[i],
+                    step_dones[i],
+                    prev_hits,
+                    prev_misses,
+                    prev_moves,
+                )
                 for k, v in breakdown.items():
                     reward_components[i][k] += v
                 dones[i] = step_dones[i]
@@ -135,7 +173,7 @@ def rollout_worker_fn(args):
                     summaries.append(summary)
                     ep_counter += 1
     return transitions, summaries
-from training.trainer import sha256_bytes
+
 
 Coordinate = Tuple[int, int]
 
@@ -182,10 +220,16 @@ class DQNConfig:
             epsilon_start=float(os.getenv("DQN_EPS_START", "1.0")),
             epsilon_end=float(os.getenv("DQN_EPS_END", os.getenv("DQN_EPS_MIN", "0.05"))),
             epsilon_min=float(os.getenv("DQN_EPS_MIN", os.getenv("DQN_EPS_END", "0.05"))),
-            epsilon_decay=int(os.getenv("DQN_EPS_DECAY_STEPS", os.getenv("DQN_EPS_DECAY", "10000"))),
+            epsilon_decay=int(
+                os.getenv("DQN_EPS_DECAY_STEPS", os.getenv("DQN_EPS_DECAY", "10000"))
+            ),
             lr=float(os.getenv("DQN_LR", "0.0003")),
             warmup_steps=int(os.getenv("DQN_WARMUP_STEPS", "1000")),
-            clip_norm=float(os.getenv("DQN_CLIP_NORM", "1.0")) if os.getenv("DQN_CLIP_NORM", "1.0") else None,
+            clip_norm=(
+                float(os.getenv("DQN_CLIP_NORM", "1.0"))
+                if os.getenv("DQN_CLIP_NORM", "1.0")
+                else None
+            ),
             use_huber=os.getenv("DQN_USE_HUBER", "1").lower() in {"1", "true", "yes", "on"},
             huber_delta=float(os.getenv("DQN_HUBER_DELTA", "1.0")),
             double_dqn=os.getenv("DQN_DOUBLE", "1").lower() in {"1", "true", "yes", "on"},
@@ -234,12 +278,22 @@ class SelfPlayConfig:
             eval_threshold=float(os.getenv("DQN_SELFPLAY_THRESHOLD", "0.7")),
             eval_workers=max(1, int(os.getenv("DQN_SELFPLAY_EVAL_WORKERS", "1"))),
             loss_penalty=float(os.getenv("DQN_SELFPLAY_LOSS_PENALTY", "5.0")),
-            metrics_path=Path(os.getenv("DQN_METRICS_PATH")).expanduser().resolve() if os.getenv("DQN_METRICS_PATH") else None,
+            metrics_path=(
+                Path(os.getenv("DQN_METRICS_PATH")).expanduser().resolve()
+                if os.getenv("DQN_METRICS_PATH")
+                else None
+            ),
             rollout_workers=max(1, int(os.getenv("DQN_ROLLOUT_WORKERS", "1"))),
             batch_size=max(1, int(os.getenv("DQN_BATCH_ENVS", "1"))),
-            move_gate=float(os.getenv("DQN_MOVE_GATE", "nan")) if os.getenv("DQN_MOVE_GATE") else None,
+            move_gate=(
+                float(os.getenv("DQN_MOVE_GATE", "nan")) if os.getenv("DQN_MOVE_GATE") else None
+            ),
             progress_log=os.getenv("DQN_PROGRESS_LOG", "1").lower() in {"1", "true", "yes", "on"},
-            progress_path=Path(os.getenv("DQN_PROGRESS_PATH")).expanduser().resolve() if os.getenv("DQN_PROGRESS_PATH") else None,
+            progress_path=(
+                Path(os.getenv("DQN_PROGRESS_PATH")).expanduser().resolve()
+                if os.getenv("DQN_PROGRESS_PATH")
+                else None
+            ),
         )
 
 
@@ -252,10 +306,24 @@ def _to_tuple_ships(ships: Optional[List[List[object]]]) -> Optional[List[Tuple[
     return converted
 
 
-def apply_phase_overrides(train_cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfig, phase) -> tuple[TrainConfig, DQNConfig, SelfPlayConfig]:
-    train_overrides = phase.hyperparams.train.dict(exclude_none=True) if phase.hyperparams and phase.hyperparams.train else {}
-    dqn_overrides = phase.hyperparams.dqn.dict(exclude_none=True) if phase.hyperparams and phase.hyperparams.dqn else {}
-    sp_overrides = phase.hyperparams.selfplay.dict(exclude_none=True) if phase.hyperparams and phase.hyperparams.selfplay else {}
+def apply_phase_overrides(
+    train_cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfig, phase
+) -> tuple[TrainConfig, DQNConfig, SelfPlayConfig]:
+    train_overrides = (
+        phase.hyperparams.train.dict(exclude_none=True)
+        if phase.hyperparams and phase.hyperparams.train
+        else {}
+    )
+    dqn_overrides = (
+        phase.hyperparams.dqn.dict(exclude_none=True)
+        if phase.hyperparams and phase.hyperparams.dqn
+        else {}
+    )
+    sp_overrides = (
+        phase.hyperparams.selfplay.dict(exclude_none=True)
+        if phase.hyperparams and phase.hyperparams.selfplay
+        else {}
+    )
     if "ships" in train_overrides:
         train_overrides["ships"] = _to_tuple_ships(train_overrides["ships"])
     return (
@@ -292,7 +360,7 @@ class ReplayBuffer:
         import random
 
         batch = random.sample(self.buffer, batch_size)
-        return map(list, zip(*batch))
+        return map(list, zip(*batch, strict=False))
 
     def __len__(self):
         return len(self.buffer)
@@ -381,7 +449,9 @@ class NumpyDQN:
         cache = {"x_pad": x_pad}
         return out, cache
 
-    def _conv2d_backward(self, grad_out: np.ndarray, x_pad: np.ndarray, weight: np.ndarray, padding: int = 1):
+    def _conv2d_backward(
+        self, grad_out: np.ndarray, x_pad: np.ndarray, weight: np.ndarray, padding: int = 1
+    ):
         batch, out_channels, h, w_in = grad_out.shape
         _, in_channels, k, _ = weight.shape
         grad_x_pad = np.zeros_like(x_pad)
@@ -462,9 +532,17 @@ class NumpyDQN:
                 "conv_channels": np.array(self.conv_channels),
             }
         else:
-            params = {"w1": self.w1, "b1": self.b1, "w2": self.w2, "b2": self.b2, "model_type": self.model_type}
+            params = {
+                "w1": self.w1,
+                "b1": self.b1,
+                "w2": self.w2,
+                "b2": self.b2,
+                "model_type": self.model_type,
+            }
         if self.use_dueling:
-            params.update({"wv": self.wv, "bv": self.bv, "wa": self.wa, "ba": self.ba, "use_dueling": True})
+            params.update(
+                {"wv": self.wv, "bv": self.bv, "wa": self.wa, "ba": self.ba, "use_dueling": True}
+            )
         else:
             params.update({"w3": self.w3, "b3": self.b3, "use_dueling": False})
         return params
@@ -484,7 +562,15 @@ def encode_env_state(env, last_action: Optional[Coordinate]) -> Tuple[np.ndarray
     # Vectorized env has numpy hits/misses; fallback to default encoder otherwise
     if hasattr(env, "hits") and isinstance(env.hits, np.ndarray):
         last_agent = None  # not tracked here
-        grid, mask = encode_state_np(env.hits, env.misses, env.moves_taken, env.max_moves, last_action, last_agent, include_hit_cluster=True)
+        grid, mask = encode_state_np(
+            env.hits,
+            env.misses,
+            env.moves_taken,
+            env.max_moves,
+            last_action,
+            last_agent,
+            include_hit_cluster=True,
+        )
         return grid, mask
     encoded = encode_state(env, last_player_shot=last_action, include_hit_cluster=True)
     grid = np.array(encoded.grid, dtype=np.float32)
@@ -510,12 +596,15 @@ def select_action(q_net: NumpyDQN, grid: np.ndarray, mask: List[int], epsilon: f
     return (idx % size, idx // size)
 
 
-def reward_breakdown(env, action: Coordinate, reward: float, done: bool, prev_hits, prev_misses, prev_moves: int) -> dict:
+def reward_breakdown(
+    env, action: Coordinate, reward: float, done: bool, prev_hits, prev_misses, prev_moves: int
+) -> dict:
     """Reconstruct reward components based on env state before the step."""
+
     def _to_set(mask):
         if hasattr(mask, "shape"):
             ys, xs = mask.nonzero()
-            return set(zip(xs.tolist(), ys.tolist()))
+            return set(zip(xs.tolist(), ys.tolist(), strict=False))
         return set(mask)
 
     step_reward = env._step_penalty(prev_moves + 1) if hasattr(env, "_step_penalty") else 0.0
@@ -544,7 +633,11 @@ def reward_breakdown(env, action: Coordinate, reward: float, done: bool, prev_hi
         # sink detection
         if hasattr(env, "cell_to_ship"):
             ship_idx = env.cell_to_ship.get(action, None)
-            if ship_idx is not None and hasattr(env, "ship_remaining") and env.ship_remaining[ship_idx] == 0:
+            if (
+                ship_idx is not None
+                and hasattr(env, "ship_remaining")
+                and env.ship_remaining[ship_idx] == 0
+            ):
                 sink_reward = getattr(env, "reward_sink_mult", 0.0) * len(env.ship_cells[ship_idx])
         elif hasattr(env, "ship_id"):
             x, y = action
@@ -555,7 +648,10 @@ def reward_breakdown(env, action: Coordinate, reward: float, done: bool, prev_hi
         if hasattr(env, "remaining") and env.remaining == 0:
             decay = 0.0
             if getattr(env, "reward_win_decay_k", 0) > 0:
-                decay = max(0.0, 1 - max(0, prev_moves + 1 - env.reward_perfect_move) / env.reward_win_decay_k)
+                decay = max(
+                    0.0,
+                    1 - max(0, prev_moves + 1 - env.reward_perfect_move) / env.reward_win_decay_k,
+                )
             win_reward = getattr(env, "reward_win_max", 0.0) * decay
     else:
         miss_reward = getattr(env, "reward_miss", 0.0)
@@ -615,12 +711,18 @@ def train_step(
         forward_states = state_arr
         forward_next_states = next_state_arr
 
-    q_vals, cache = q_net.forward(forward_states, board_size=board_size if q_net.model_type == "cnn" else None)
+    q_vals, cache = q_net.forward(
+        forward_states, board_size=board_size if q_net.model_type == "cnn" else None
+    )
     idx = actions[:, 1] * board_size + actions[:, 0]
     chosen_q = q_vals[range(len(states)), idx]
 
-    next_q_online, _ = q_net.forward(forward_next_states, board_size=board_size if q_net.model_type == "cnn" else None)
-    next_q_target, _ = target_net.forward(forward_next_states, board_size=board_size if q_net.model_type == "cnn" else None)
+    next_q_online, _ = q_net.forward(
+        forward_next_states, board_size=board_size if q_net.model_type == "cnn" else None
+    )
+    next_q_target, _ = target_net.forward(
+        forward_next_states, board_size=board_size if q_net.model_type == "cnn" else None
+    )
     next_q_online = next_q_online.reshape(len(states), -1)
     next_q_target = next_q_target.reshape(len(states), -1)
     next_q_online = np.where(masks_arr, next_q_online, -1e9)
@@ -674,11 +776,15 @@ def train_step(
 
         grad_h2 = grad_flat.reshape(cache["h2"].shape)
         grad_h2 = relu_backward(grad_h2, cache["conv2_out"])
-        grad_h1, grad_conv2, grad_conv2_b = q_net._conv2d_backward(grad_h2, cache["conv2"]["x_pad"], q_net.conv2, padding=1)
+        grad_h1, grad_conv2, grad_conv2_b = q_net._conv2d_backward(
+            grad_h2, cache["conv2"]["x_pad"], q_net.conv2, padding=1
+        )
         grad_tensors.extend([grad_conv2, grad_conv2_b])
 
         grad_h1 = relu_backward(grad_h1, cache["conv1_out"])
-        grad_input, grad_conv1, grad_conv1_b = q_net._conv2d_backward(grad_h1, cache["conv1"]["x_pad"], q_net.conv1, padding=1)
+        grad_input, grad_conv1, grad_conv1_b = q_net._conv2d_backward(
+            grad_h1, cache["conv1"]["x_pad"], q_net.conv1, padding=1
+        )
         grad_tensors.extend([grad_conv1, grad_conv1_b])
 
         _clip_gradients(grad_tensors, clip_norm)
@@ -747,7 +853,9 @@ def train_step(
         q_net.b1 -= lr * grad_b1
 
 
-def play_game(policy: NumpyDQN, opponent: Optional[NumpyDQN], env_params: dict, seed: int) -> tuple[bool, int, int]:
+def play_game(
+    policy: NumpyDQN, opponent: Optional[NumpyDQN], env_params: dict, seed: int
+) -> tuple[bool, int, int]:
     rng = np.random.default_rng(seed)
     env_me = VectorEnv(seed=seed, **env_params)
     env_opp = VectorEnv(seed=seed + 1, **env_params)
@@ -767,7 +875,11 @@ def play_game(policy: NumpyDQN, opponent: Optional[NumpyDQN], env_params: dict, 
                 return False, env_me.moves_taken, env_opp.moves_taken
             choice = rng.choice(legal)
             action_opp = (choice % board_size, choice // board_size)
-        elif isinstance(opponent, tuple) and opponent[0] in {"random", "hunt_target", "probability"}:
+        elif isinstance(opponent, tuple) and opponent[0] in {
+            "random",
+            "hunt_target",
+            "probability",
+        }:
             bot_kind, bot_impl = opponent
             if bot_kind == "random":
                 idx = bot_impl((env_me.hits, env_me.misses), board_size)
@@ -791,6 +903,7 @@ def _play_game_args(args):
     def clone(val):
         return val.copy() if hasattr(val, "copy") else val
 
+    board_size = env_params["board_size"]
     model_type = policy_params.get("model_type", "mlp")
     use_dueling = policy_params.get("use_dueling", False)
     if model_type == "cnn":
@@ -813,16 +926,28 @@ def _play_game_args(args):
         policy.conv2, policy.conv2_b = conv2, clone(policy_params["conv2_b"])
         policy.fc, policy.fc_b = clone(policy_params["fc"]), clone(policy_params["fc_b"])
         if use_dueling:
-            policy.wv, policy.bv, policy.wa, policy.ba = [clone(policy_params[k]) for k in ("wv", "bv", "wa", "ba")]
+            policy.wv, policy.bv, policy.wa, policy.ba = [
+                clone(policy_params[k]) for k in ("wv", "bv", "wa", "ba")
+            ]
         else:
             policy.w3, policy.b3 = [clone(policy_params[k]) for k in ("w3", "b3")]
     else:
         input_dim = policy_params["w1"].shape[0]
         hidden = policy_params["w1"].shape[1]
-        policy = NumpyDQN(input_dim, board_size * board_size, hidden=hidden, use_dueling=use_dueling, model=model_type)
-        policy.w1, policy.b1, policy.w2, policy.b2 = [clone(policy_params[k]) for k in ("w1", "b1", "w2", "b2")]
+        policy = NumpyDQN(
+            input_dim,
+            board_size * board_size,
+            hidden=hidden,
+            use_dueling=use_dueling,
+            model=model_type,
+        )
+        policy.w1, policy.b1, policy.w2, policy.b2 = [
+            clone(policy_params[k]) for k in ("w1", "b1", "w2", "b2")
+        ]
         if policy.use_dueling:
-            policy.wv, policy.bv, policy.wa, policy.ba = [clone(policy_params[k]) for k in ("wv", "bv", "wa", "ba")]
+            policy.wv, policy.bv, policy.wa, policy.ba = [
+                clone(policy_params[k]) for k in ("wv", "bv", "wa", "ba")
+            ]
         else:
             policy.w3, policy.b3 = [clone(policy_params[k]) for k in ("w3", "b3")]
     opponent = None
@@ -847,7 +972,11 @@ def _play_game_args(args):
                 conv2 = clone(opponent_params["conv2"])
                 conv_channels = (conv1.shape[0], conv2.shape[0])
                 input_channels = conv1.shape[1]
-                hidden = opponent_params["wa"].shape[0] if opp_dueling else opponent_params["w3"].shape[0]
+                hidden = (
+                    opponent_params["wa"].shape[0]
+                    if opp_dueling
+                    else opponent_params["w3"].shape[0]
+                )
                 opponent = NumpyDQN(
                     board_size * board_size * input_channels,
                     board_size * board_size,
@@ -860,18 +989,33 @@ def _play_game_args(args):
                 )
                 opponent.conv1, opponent.conv1_b = conv1, clone(opponent_params["conv1_b"])
                 opponent.conv2, opponent.conv2_b = conv2, clone(opponent_params["conv2_b"])
-                opponent.fc, opponent.fc_b = clone(opponent_params["fc"]), clone(opponent_params["fc_b"])
+                opponent.fc, opponent.fc_b = (
+                    clone(opponent_params["fc"]),
+                    clone(opponent_params["fc_b"]),
+                )
                 if opp_dueling:
-                    opponent.wv, opponent.bv, opponent.wa, opponent.ba = [clone(opponent_params[k]) for k in ("wv", "bv", "wa", "ba")]
+                    opponent.wv, opponent.bv, opponent.wa, opponent.ba = [
+                        clone(opponent_params[k]) for k in ("wv", "bv", "wa", "ba")
+                    ]
                 else:
                     opponent.w3, opponent.b3 = [clone(opponent_params[k]) for k in ("w3", "b3")]
             else:
                 input_dim = opponent_params["w1"].shape[0]
                 hidden = opponent_params["w1"].shape[1]
-                opponent = NumpyDQN(input_dim, board_size * board_size, hidden=hidden, use_dueling=opp_dueling, model=opp_model)
-                opponent.w1, opponent.b1, opponent.w2, opponent.b2 = [clone(opponent_params[k]) for k in ("w1", "b1", "w2", "b2")]
+                opponent = NumpyDQN(
+                    input_dim,
+                    board_size * board_size,
+                    hidden=hidden,
+                    use_dueling=opp_dueling,
+                    model=opp_model,
+                )
+                opponent.w1, opponent.b1, opponent.w2, opponent.b2 = [
+                    clone(opponent_params[k]) for k in ("w1", "b1", "w2", "b2")
+                ]
                 if opponent.use_dueling:
-                    opponent.wv, opponent.bv, opponent.wa, opponent.ba = [clone(opponent_params[k]) for k in ("wv", "bv", "wa", "ba")]
+                    opponent.wv, opponent.bv, opponent.wa, opponent.ba = [
+                        clone(opponent_params[k]) for k in ("wv", "bv", "wa", "ba")
+                    ]
                 else:
                     opponent.w3, opponent.b3 = [clone(opponent_params[k]) for k in ("w3", "b3")]
     return play_game(policy, opponent, env_params, seed)
@@ -901,7 +1045,10 @@ def evaluate_policy(
             return ("hunt_target", HuntTargetBot(env_params["board_size"]))
         if bot_type == "probability":
             lengths = [s for _, s in ships]
-            return ("probability", ProbabilityBot(env_params["board_size"], remaining_ships=lengths))
+            return (
+                "probability",
+                ProbabilityBot(env_params["board_size"], remaining_ships=lengths),
+            )
         raise ValueError(f"unknown bot_type {bot_type}")
 
     opponent_is_bot = isinstance(opponent, str)
@@ -911,7 +1058,14 @@ def evaluate_policy(
             opp_inst = _make_bot(opponent) if opponent_is_bot else opponent
             win, p1_moves, p2_moves = play_game(policy, opp_inst, env_params, s)
             wins += 1 if win else 0
-            summaries.append({"opponent": opponent_label, "outcome": 1 if win else 0, "p1_moves": p1_moves, "p2_moves": p2_moves})
+            summaries.append(
+                {
+                    "opponent": opponent_label,
+                    "outcome": 1 if win else 0,
+                    "p1_moves": p1_moves,
+                    "p2_moves": p2_moves,
+                }
+            )
         return wins / games, summaries
     policy_params = {**policy.parameters(), "model_type": policy.model_type}
     opponent_params = None
@@ -927,11 +1081,24 @@ def evaluate_policy(
     wins = 0
     for win, p1_moves, p2_moves in results:
         wins += 1 if win else 0
-        summaries.append({"opponent": opponent_label, "outcome": 1 if win else 0, "p1_moves": p1_moves, "p2_moves": p2_moves})
+        summaries.append(
+            {
+                "opponent": opponent_label,
+                "outcome": 1 if win else 0,
+                "p1_moves": p1_moves,
+                "p2_moves": p2_moves,
+            }
+        )
     return wins / games, summaries
 
 
-def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfig, opponent_type: Optional[str] = None, curriculum: Optional[CurriculumConfig] = None) -> dict:
+def run_dqn_selfplay(
+    cfg: TrainConfig,
+    dqn_cfg: DQNConfig,
+    sp_cfg: SelfPlayConfig,
+    opponent_type: Optional[str] = None,
+    curriculum: Optional[CurriculumConfig] = None,
+) -> dict:
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     debug = os.getenv("DQN_DEBUG", "0").lower() in {"1", "true", "yes", "on"}
     curriculum = curriculum or load_curriculum()
@@ -959,7 +1126,9 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
 
     def configure_for_phase(phase) -> None:
         nonlocal cfg, dqn_cfg, sp_cfg, env_params, env, q_net, target_net, buffer, epsilon, eps_min, eps_decay
-        cfg, dqn_cfg, sp_cfg = apply_phase_overrides(base_train_cfg, base_dqn_cfg, base_sp_cfg, phase)
+        cfg, dqn_cfg, sp_cfg = apply_phase_overrides(
+            base_train_cfg, base_dqn_cfg, base_sp_cfg, phase
+        )
         env_params = {
             "board_size": cfg.board_size,
             "ships": cfg.ships or DEFAULT_SHIPS,
@@ -1004,6 +1173,7 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
         epsilon = dqn_cfg.epsilon_start
         eps_min = dqn_cfg.epsilon_min
         eps_decay = (dqn_cfg.epsilon_start - eps_min) / max(1, dqn_cfg.epsilon_decay)
+
     metrics_path = sp_cfg.metrics_path or (cfg.output_dir / f"dqn_selfplay_metrics-{run_id}.csv")
     progress_path = sp_cfg.progress_path or (cfg.output_dir / f"dqn_progress-{run_id}.jsonl")
     log_counter = 1
@@ -1016,7 +1186,11 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
         if not sp_cfg.progress_log:
             return
         progress_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"timestamp": datetime.now(timezone.utc).isoformat(), "curriculum_phase": state.current_phase.id, **data}
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "curriculum_phase": state.current_phase.id,
+            **data,
+        }
         with progress_path.open("a") as pf:
             pf.write(json.dumps(payload) + "\n")
 
@@ -1045,8 +1219,28 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
     with metrics_path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=metric_fields)
         writer.writeheader()
-        writer.writerow({"timestamp": datetime.now(timezone.utc).isoformat(), "phase": "run_start", "curriculum_phase": state.current_phase.id, "round": 0, "episode": 0, "opponent": None, "epsilon": dqn_cfg.epsilon_start, "outcome": None, "p1_moves": None, "p2_moves": None})
-    log_progress({"event": "run_start", "run_id": run_id, "epsilon": dqn_cfg.epsilon_start, "curriculum_phase": state.current_phase.id})
+        writer.writerow(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "phase": "run_start",
+                "curriculum_phase": state.current_phase.id,
+                "round": 0,
+                "episode": 0,
+                "opponent": None,
+                "epsilon": dqn_cfg.epsilon_start,
+                "outcome": None,
+                "p1_moves": None,
+                "p2_moves": None,
+            }
+        )
+    log_progress(
+        {
+            "event": "run_start",
+            "run_id": run_id,
+            "epsilon": dqn_cfg.epsilon_start,
+            "curriculum_phase": state.current_phase.id,
+        }
+    )
 
     def log_metrics(row: dict) -> None:
         if not metrics_path:
@@ -1081,9 +1275,16 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 while not done:
                     grid, mask = encode_env_state(env, last_action)
                     action = select_action(q_net, grid, mask, epsilon)
-                    prev_hits, prev_misses, prev_remaining, prev_moves = env.hits.copy(), env.misses.copy(), env.remaining, env.moves_taken
+                    prev_hits, prev_misses, _, prev_moves = (
+                        env.hits.copy(),
+                        env.misses.copy(),
+                        env.remaining,
+                        env.moves_taken,
+                    )
                     reward, done = env.step(action)
-                    breakdown = reward_breakdown(env, action, reward, done, prev_hits, prev_misses, prev_moves)
+                    breakdown = reward_breakdown(
+                        env, action, reward, done, prev_hits, prev_misses, prev_moves
+                    )
                     for k, v in breakdown.items():
                         comp[k] += v
                     next_grid, next_mask = encode_env_state(env, action)
@@ -1129,8 +1330,13 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
             policy_params = {**q_net.parameters(), "model_type": q_net.model_type}
             per_worker = math.ceil(sp_cfg.chunk_episodes / sp_cfg.rollout_workers)
             seeds = [cfg.seed + round_idx * 1000 + i for i in range(sp_cfg.rollout_workers)]
-            params = [(policy_params, env_params, None, epsilon, per_worker, s, sp_cfg.batch_size) for s in seeds]
-            dlog(f"rollout mp: workers={sp_cfg.rollout_workers} per_worker={per_worker} batch_envs={sp_cfg.batch_size}")
+            params = [
+                (policy_params, env_params, None, epsilon, per_worker, s, sp_cfg.batch_size)
+                for s in seeds
+            ]
+            dlog(
+                f"rollout mp: workers={sp_cfg.rollout_workers} per_worker={per_worker} batch_envs={sp_cfg.batch_size}"
+            )
             with mp.Pool(processes=sp_cfg.rollout_workers) as pool:
                 results = pool.map(rollout_worker_fn, params)
             for transitions, summaries in results:
@@ -1146,7 +1352,15 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                         "p1_moves": s.get("p1_moves"),
                         "p2_moves": s.get("p2_moves"),
                     }
-                    for key in ("total_reward", "step_reward", "hit_reward", "miss_reward", "sink_reward", "win_reward", "loss_reward"):
+                    for key in (
+                        "total_reward",
+                        "step_reward",
+                        "hit_reward",
+                        "miss_reward",
+                        "sink_reward",
+                        "win_reward",
+                        "loss_reward",
+                    ):
                         if key in s:
                             row[key] = s[key]
                     log_metrics(row)
@@ -1174,7 +1388,11 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 steps += 1
             target_net = q_net.copy()
             current_ep = global_ep - 1
-            print(f"[dqn-selfplay] round={round_idx} episodes={current_ep} eps={epsilon:.3f}", file=sys.stderr, flush=True)
+            print(
+                f"[dqn-selfplay] round={round_idx} episodes={current_ep} eps={epsilon:.3f}",
+                file=sys.stderr,
+                flush=True,
+            )
         return global_ep
 
     dlog(
@@ -1195,7 +1413,10 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 "curriculum_state": str(state.state_path),
             }
             if curriculum:
-                summary["curriculum"] = {"version": curriculum.version, "phases": [p.id for p in curriculum.phases]}
+                summary["curriculum"] = {
+                    "version": curriculum.version,
+                    "phases": [p.id for p in curriculum.phases],
+                }
             summary_path = cfg.output_dir / f"dqn_selfplay_run-{run_id}.json"
             summary_path.parent.mkdir(parents=True, exist_ok=True)
             summary_path.write_text(json.dumps(summary, indent=2))
@@ -1206,9 +1427,19 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
         trained_eps = current_episode - start_ep
         state.record_training(trained_eps)
         state.persist()
-        log_progress({"event": "train_round_complete", "round": round_idx, "epsilon": epsilon, "buffer": len(buffer), "episodes": trained_eps})
+        log_progress(
+            {
+                "event": "train_round_complete",
+                "round": round_idx,
+                "epsilon": epsilon,
+                "buffer": len(buffer),
+                "episodes": trained_eps,
+            }
+        )
         # baseline eval vs opponent mix
-        phase_opponent = select_opponent_from_mix(state.current_phase.opponents, rng) or opponent_type
+        phase_opponent = (
+            select_opponent_from_mix(state.current_phase.opponents, rng) or opponent_type
+        )
         baseline_wr = None
         if sp_cfg.baseline_games > 0:
             baseline_wr, baseline_summaries = evaluate_policy(
@@ -1220,16 +1451,41 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 workers=sp_cfg.baseline_workers,
                 opponent_label=phase_opponent or "baseline",
             )
-            print(f"[dqn-selfplay] round {round_idx} baseline win_rate={baseline_wr:.3f}", file=sys.stderr, flush=True)
+            print(
+                f"[dqn-selfplay] round {round_idx} baseline win_rate={baseline_wr:.3f}",
+                file=sys.stderr,
+                flush=True,
+            )
             dlog(f"baseline eval done round={round_idx} wr={baseline_wr:.3f}")
             for s in baseline_summaries:
-                log_metrics({"phase": "baseline_eval", "round": round_idx, "episode": current_episode, "opponent": s["opponent"], "epsilon": epsilon, "outcome": s["outcome"], "p1_moves": s.get("p1_moves"), "p2_moves": s.get("p2_moves")})
+                log_metrics(
+                    {
+                        "phase": "baseline_eval",
+                        "round": round_idx,
+                        "episode": current_episode,
+                        "opponent": s["opponent"],
+                        "epsilon": epsilon,
+                        "outcome": s["outcome"],
+                        "p1_moves": s.get("p1_moves"),
+                        "p2_moves": s.get("p2_moves"),
+                    }
+                )
             if baseline_wr < sp_cfg.baseline_threshold:
                 if round_idx == sp_cfg.max_rounds and not state.should_advance():
-                    raise RuntimeError(f"baseline win_rate {baseline_wr:.3f} below threshold {sp_cfg.baseline_threshold}")
+                    raise RuntimeError(
+                        f"baseline win_rate {baseline_wr:.3f} below threshold {sp_cfg.baseline_threshold}"
+                    )
                 round_idx += 1
                 continue
-            log_progress({"event": "baseline_eval", "round": round_idx, "win_rate": baseline_wr, "games": sp_cfg.baseline_games, "opponent": phase_opponent})
+            log_progress(
+                {
+                    "event": "baseline_eval",
+                    "round": round_idx,
+                    "win_rate": baseline_wr,
+                    "games": sp_cfg.baseline_games,
+                    "opponent": phase_opponent,
+                }
+            )
 
         snapshot = q_net.copy()
         eval_opponent = phase_opponent if phase_opponent else snapshot
@@ -1242,17 +1498,45 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
             workers=sp_cfg.eval_workers,
             opponent_label=phase_opponent or "selfplay_eval",
         )
-        print(f"[dqn-selfplay] round {round_idx} self win_rate={wr:.3f}", file=sys.stderr, flush=True)
+        print(
+            f"[dqn-selfplay] round {round_idx} self win_rate={wr:.3f}", file=sys.stderr, flush=True
+        )
         dlog(f"selfplay eval done round={round_idx} wr={wr:.3f}")
         for s in eval_summaries:
-            log_metrics({"phase": "selfplay_eval", "round": round_idx, "episode": current_episode, "opponent": s["opponent"], "epsilon": epsilon, "outcome": s["outcome"], "p1_moves": s.get("p1_moves"), "p2_moves": s.get("p2_moves")})
+            log_metrics(
+                {
+                    "phase": "selfplay_eval",
+                    "round": round_idx,
+                    "episode": current_episode,
+                    "opponent": s["opponent"],
+                    "epsilon": epsilon,
+                    "outcome": s["outcome"],
+                    "p1_moves": s.get("p1_moves"),
+                    "p2_moves": s.get("p2_moves"),
+                }
+            )
         move_values = [s.get("p1_moves") for s in eval_summaries if s.get("p1_moves") is not None]
         avg_moves = sum(move_values) / len(move_values) if move_values else None
         state.record_round(wr, avg_moves, baseline_wr)
         state.persist()
-        log_progress({"event": "selfplay_eval", "round": round_idx, "win_rate": wr, "games": sp_cfg.eval_games, "avg_moves": avg_moves, "opponent": phase_opponent})
-        if wr >= sp_cfg.eval_threshold and (sp_cfg.move_gate is None or (avg_moves is not None and avg_moves <= sp_cfg.move_gate)):
-            artifact_name = cfg.artifact_name if cfg.artifact_name.endswith(".npz") else f"{cfg.artifact_name}.npz"
+        log_progress(
+            {
+                "event": "selfplay_eval",
+                "round": round_idx,
+                "win_rate": wr,
+                "games": sp_cfg.eval_games,
+                "avg_moves": avg_moves,
+                "opponent": phase_opponent,
+            }
+        )
+        if wr >= sp_cfg.eval_threshold and (
+            sp_cfg.move_gate is None or (avg_moves is not None and avg_moves <= sp_cfg.move_gate)
+        ):
+            artifact_name = (
+                cfg.artifact_name
+                if cfg.artifact_name.endswith(".npz")
+                else f"{cfg.artifact_name}.npz"
+            )
             artifact_path = cfg.output_dir / artifact_name
             artifact_path.parent.mkdir(parents=True, exist_ok=True)
             q_net.save(artifact_path)
@@ -1312,37 +1596,68 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 "curriculum_phase": state.current_phase.id,
             }
             if curriculum:
-                summary["curriculum"] = {"version": curriculum.version, "phases": [p.id for p in curriculum.phases]}
+                summary["curriculum"] = {
+                    "version": curriculum.version,
+                    "phases": [p.id for p in curriculum.phases],
+                }
             summary_path = cfg.output_dir / f"dqn_selfplay_run-{run_id}.json"
             summary_path.write_text(json.dumps(summary, indent=2))
             return summary
         else:
-            if wr >= sp_cfg.eval_threshold and sp_cfg.move_gate is not None and (avg_moves is None or avg_moves > sp_cfg.move_gate):
-                print(f"[dqn-selfplay] round {round_idx} win_rate ok but avg_moves={avg_moves} above gate {sp_cfg.move_gate}", file=sys.stderr, flush=True)
+            if (
+                wr >= sp_cfg.eval_threshold
+                and sp_cfg.move_gate is not None
+                and (avg_moves is None or avg_moves > sp_cfg.move_gate)
+            ):
+                print(
+                    f"[dqn-selfplay] round {round_idx} win_rate ok but avg_moves={avg_moves} above gate {sp_cfg.move_gate}",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
         if state.should_advance():
             prev_phase = state.current_phase.id
             advanced = state.advance()
             state.persist()
-            log_progress({"event": "curriculum_advance", "from": prev_phase, "to": state.current_phase.id if advanced else prev_phase})
+            log_progress(
+                {
+                    "event": "curriculum_advance",
+                    "from": prev_phase,
+                    "to": state.current_phase.id if advanced else prev_phase,
+                }
+            )
             if advanced:
                 configure_for_phase(state.current_phase)
-                log_progress({"event": "phase_start", "round": round_idx, "phase_id": state.current_phase.id})
+                log_progress(
+                    {"event": "phase_start", "round": round_idx, "phase_id": state.current_phase.id}
+                )
                 round_idx = 1
                 continue
 
         round_idx += 1
         if round_idx > sp_cfg.max_rounds:
-            raise RuntimeError(f"self-play win_rate did not reach threshold {sp_cfg.eval_threshold}")
+            raise RuntimeError(
+                f"self-play win_rate did not reach threshold {sp_cfg.eval_threshold}"
+            )
 
 
 def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Run DQN self-play training")
-    parser.add_argument("--opponent", choices=["random", "hunt_target", "probability"], default=None, help="Scripted opponent for evaluation (baseline/random by default)")
+    parser.add_argument(
+        "--opponent",
+        choices=["random", "hunt_target", "probability"],
+        default=None,
+        help="Scripted opponent for evaluation (baseline/random by default)",
+    )
     parser.add_argument("--config", type=str, default=None, help="Path to YAML config for training")
-    parser.add_argument("--curriculum", type=str, default=None, help="Path to curriculum YAML (falls back to configs/curriculum.default.yaml)")
+    parser.add_argument(
+        "--curriculum",
+        type=str,
+        default=None,
+        help="Path to curriculum YAML (falls back to configs/curriculum.default.yaml)",
+    )
     args = parser.parse_args()
 
     yaml_data = {}

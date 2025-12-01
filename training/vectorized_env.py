@@ -1,5 +1,6 @@
-import numpy as np
 from typing import List, Tuple
+
+import numpy as np
 
 Coordinate = Tuple[int, int]
 
@@ -33,7 +34,13 @@ class VectorEnv:
     ):
         self.board_size = board_size
         self.seed = seed
-        self.ships = ships or [("Carrier", 5), ("Battleship", 4), ("Cruiser", 3), ("Submarine", 3), ("Destroyer", 2)]
+        self.ships = ships or [
+            ("Carrier", 5),
+            ("Battleship", 4),
+            ("Cruiser", 3),
+            ("Submarine", 3),
+            ("Destroyer", 2),
+        ]
         self.allow_adjacent = allow_adjacent
         self.rng = np.random.default_rng(seed)
         self.max_moves = board_size * board_size
@@ -68,7 +75,9 @@ class VectorEnv:
             while not placed:
                 attempts += 1
                 if attempts > 5000:
-                    raise ValueError("Failed to place ships with current constraints; enlarge board or allow adjacency.")
+                    raise ValueError(
+                        "Failed to place ships with current constraints; enlarge board or allow adjacency."
+                    )
                 vertical = self.rng.integers(0, 2) == 1
                 if vertical:
                     x = self.rng.integers(0, self.board_size)
@@ -84,7 +93,11 @@ class VectorEnv:
                     bad = False
                     for cx, cy in coords:
                         for nx, ny in _neighbors((cx, cy)):
-                            if 0 <= nx < self.board_size and 0 <= ny < self.board_size and board[ny, nx]:
+                            if (
+                                0 <= nx < self.board_size
+                                and 0 <= ny < self.board_size
+                                and board[ny, nx]
+                            ):
                                 bad = True
                                 break
                         if bad:
@@ -126,7 +139,12 @@ class VectorEnv:
             if self.remaining == 0:
                 decay = 0.0
                 if self.reward_win_decay_k > 0:
-                    decay = max(0.0, 1 - max(0, self.moves_taken - self.reward_perfect_move) / self.reward_win_decay_k)
+                    decay = max(
+                        0.0,
+                        1
+                        - max(0, self.moves_taken - self.reward_perfect_move)
+                        / self.reward_win_decay_k,
+                    )
                 reward += self.reward_win_max * decay
                 done = True
         else:
@@ -173,7 +191,7 @@ class BatchedEnv:
     def step(self, actions: List[Coordinate]) -> tuple[List[float], List[bool]]:
         rewards = []
         dones = []
-        for env, action in zip(self.envs, actions):
+        for env, action in zip(self.envs, actions, strict=False):
             r, d = env.step(action)
             rewards.append(r)
             dones.append(d)

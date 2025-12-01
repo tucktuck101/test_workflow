@@ -2,15 +2,15 @@ import csv
 import json
 import random
 import sys
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from training.config import TrainConfig
-from training.env import BattleshipEnv, DEFAULT_SHIPS
+from training.env import DEFAULT_SHIPS, BattleshipEnv
 from training.policy import QLearner
-from training.trainer import sha256_bytes, write_artifact
+from training.trainer import write_artifact
 
 Coordinate = Tuple[int, int]
 PolicyMap = Dict[Coordinate, float]
@@ -65,7 +65,9 @@ def _policy_to_tuple_map(policy: Dict[str, float]) -> PolicyMap:
     return out
 
 
-def _greedy_action(policy: Optional[PolicyMap], actions: List[Coordinate], rng: random.Random) -> Coordinate:
+def _greedy_action(
+    policy: Optional[PolicyMap], actions: List[Coordinate], rng: random.Random
+) -> Coordinate:
     if not actions:
         return (0, 0)
     if not policy:
@@ -121,8 +123,18 @@ def evaluate_policies(
     wins = 0
     total_moves = 0
     for _ in range(episodes):
-        env_me = BattleshipEnv(board_size=board_size, seed=rng.randint(0, 10_000), ships=ships, allow_adjacent=allow_adjacent)
-        env_opp = BattleshipEnv(board_size=board_size, seed=rng.randint(0, 10_000), ships=ships, allow_adjacent=allow_adjacent)
+        env_me = BattleshipEnv(
+            board_size=board_size,
+            seed=rng.randint(0, 10_000),
+            ships=ships,
+            allow_adjacent=allow_adjacent,
+        )
+        env_opp = BattleshipEnv(
+            board_size=board_size,
+            seed=rng.randint(0, 10_000),
+            ships=ships,
+            allow_adjacent=allow_adjacent,
+        )
         moves = 0
         while True:
             action_me = _greedy_action(current_policy, env_opp.available_actions(), rng)
@@ -271,8 +283,12 @@ def run_selfplay(config: TrainConfig, self_cfg: SelfPlayConfig) -> Dict[str, str
             learner.epsilon *= learner.epsilon_decay
             if global_ep % self_cfg.snapshot_interval == 0:
                 snapshot_policy = _policy_to_tuple_map(learner.export_policy())
-            if global_ep == 1 or global_ep % config.log_interval == 0 or (round_idx == self_cfg.max_rounds and ep == chunk):
-                window = rewards[-config.log_interval:] or rewards
+            if (
+                global_ep == 1
+                or global_ep % config.log_interval == 0
+                or (round_idx == self_cfg.max_rounds and ep == chunk)
+            ):
+                window = rewards[-config.log_interval :] or rewards
                 window_mean = sum(window) / len(window)
                 print(
                     f"[selfplay] ep {global_ep}/{total_episodes} reward={reward:.3f} "

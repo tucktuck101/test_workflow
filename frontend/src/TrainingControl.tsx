@@ -56,7 +56,8 @@ export function TrainingControl({ onError }: Props) {
       if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
       throw new Error('YAML must define a mapping/object.');
     } catch (err: any) {
-      const msg = err?.message || 'Invalid YAML';
+      const detail = err?.message;
+      const msg = detail ? `Invalid YAML: ${detail}` : 'Invalid YAML';
       setMessage(msg);
       onError?.(msg);
       return null;
@@ -145,7 +146,10 @@ export function TrainingControl({ onError }: Props) {
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
-      <div className="status-line" style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+      <div
+        className="status-line"
+        style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}
+      >
         <strong>Training Control</strong>
         <span className="badge">{statusBadge}</span>
       </div>
@@ -171,7 +175,9 @@ export function TrainingControl({ onError }: Props) {
           Cancel run
         </button>
         {run && (
-          <span style={{ color: 'var(--muted)', fontSize: 13 }}>Run ID: <code>{run.run_id}</code></span>
+          <span style={{ color: 'var(--muted)', fontSize: 13 }}>
+            Run ID: <code>{run.run_id}</code>
+          </span>
         )}
       </div>
       {message && (
@@ -186,7 +192,9 @@ export function TrainingControl({ onError }: Props) {
         </div>
         <div className="card mini">
           <div className="label">Win rate</div>
-          <div className="value">{winRate !== null ? `${(winRate as number * 100).toFixed(1)}%` : '—'}</div>
+          <div className="value">
+            {winRate !== null ? `${((winRate as number) * 100).toFixed(1)}%` : '—'}
+          </div>
         </div>
         <div className="card mini">
           <div className="label">Loss</div>
@@ -200,7 +208,9 @@ export function TrainingControl({ onError }: Props) {
       <div style={{ marginTop: 12 }}>
         <div className="label">Win rate trend</div>
         {metricHistory.length === 0 ? (
-          <div className="message warn" style={{ marginTop: 6 }}>No metrics yet.</div>
+          <div className="message warn" style={{ marginTop: 6 }}>
+            No metrics yet.
+          </div>
         ) : (
           <svg width="100%" height="40" viewBox="0 0 100 30" preserveAspectRatio="none">
             <path d={sparklinePath} stroke="var(--accent)" fill="none" strokeWidth="1.5" />

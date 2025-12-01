@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
 
-
 log = logging.getLogger(__name__)
 
 
@@ -30,13 +29,18 @@ class TrainerRun:
 
 
 class InMemoryRunStore:
-    def __init__(self):
+    def __init__(self) -> None:
         self._runs: Dict[str, TrainerRun] = {}
         self._lock = threading.Lock()
 
     def create(self, config: Dict[str, Any]) -> TrainerRun:
         run_id = str(uuid.uuid4())
-        run = TrainerRun(run_id=run_id, status=RunStatus.PENDING, config=config or {}, metrics={"episodes": 0, "win_rate": 0.0, "loss": 0.0, "curriculum_phase": "bootcamp"})
+        run = TrainerRun(
+            run_id=run_id,
+            status=RunStatus.PENDING,
+            config=config or {},
+            metrics={"episodes": 0, "win_rate": 0.0, "loss": 0.0, "curriculum_phase": "bootcamp"},
+        )
         with self._lock:
             self._runs[run_id] = run
         return run
@@ -45,7 +49,9 @@ class InMemoryRunStore:
         with self._lock:
             return self._runs.get(run_id)
 
-    def update_status(self, run_id: str, status: RunStatus, error: Optional[str] = None) -> Optional[TrainerRun]:
+    def update_status(
+        self, run_id: str, status: RunStatus, error: Optional[str] = None
+    ) -> Optional[TrainerRun]:
         with self._lock:
             run = self._runs.get(run_id)
             if not run:
@@ -71,7 +77,9 @@ class InMemoryRunStore:
 
 
 class TrainerOrchestrator:
-    def start_run(self, config: Dict[str, Any] | None = None) -> TrainerRun:  # pragma: no cover - interface
+    def start_run(
+        self, config: Dict[str, Any] | None = None
+    ) -> TrainerRun:  # pragma: no cover - interface
         raise NotImplementedError
 
     def get_run(self, run_id: str) -> Optional[TrainerRun]:  # pragma: no cover - interface
@@ -87,7 +95,9 @@ class TrainerOrchestrator:
 class DummyTrainerOrchestrator(TrainerOrchestrator):
     """Local/dev orchestrator that simulates job lifecycle."""
 
-    def __init__(self, store: Optional[InMemoryRunStore] = None, completion_delay: float = 0.1):
+    def __init__(
+        self, store: Optional[InMemoryRunStore] = None, completion_delay: float = 0.1
+    ) -> None:
         self.store = store or InMemoryRunStore()
         self.completion_delay = completion_delay
 
@@ -97,12 +107,15 @@ class DummyTrainerOrchestrator(TrainerOrchestrator):
         self.store.update_status(run.run_id, RunStatus.RUNNING)
         log.info("trainer run started", extra={"run_id": run.run_id, "config": config})
 
-        def _complete():
+        def _complete() -> None:
             current = self.store.get(run.run_id)
             if not current or current.status != RunStatus.RUNNING:
                 return
             # update some dummy metrics
-            self.store.update_metrics(run.run_id, {"episodes": 10, "win_rate": 0.6, "loss": 0.4, "curriculum_phase": "bootcamp"})
+            self.store.update_metrics(
+                run.run_id,
+                {"episodes": 10, "win_rate": 0.6, "loss": 0.4, "curriculum_phase": "bootcamp"},
+            )
             if config.get("fail"):
                 self.store.update_status(run.run_id, RunStatus.FAILED, error="simulated_failure")
                 log.error("trainer run failed", extra={"run_id": run.run_id})
@@ -138,7 +151,7 @@ class DummyTrainerOrchestrator(TrainerOrchestrator):
 class ComposeTrainerOrchestrator(TrainerOrchestrator):
     """Placeholder for docker-compose orchestration."""
 
-    def __init__(self, store: Optional[InMemoryRunStore] = None):
+    def __init__(self, store: Optional[InMemoryRunStore] = None) -> None:
         self.store = store or InMemoryRunStore()
 
     def start_run(self, config: Dict[str, Any] | None = None) -> TrainerRun:
@@ -159,7 +172,7 @@ class ComposeTrainerOrchestrator(TrainerOrchestrator):
 class KubernetesTrainerOrchestrator(TrainerOrchestrator):
     """Placeholder for k8s job orchestration."""
 
-    def __init__(self, store: Optional[InMemoryRunStore] = None):
+    def __init__(self, store: Optional[InMemoryRunStore] = None) -> None:
         self.store = store or InMemoryRunStore()
 
     def start_run(self, config: Dict[str, Any] | None = None) -> TrainerRun:

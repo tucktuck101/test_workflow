@@ -1,9 +1,9 @@
 import logging
 import random
 import time
-from typing import Callable, List, Tuple
+from typing import Callable, List, Literal, Tuple
 
-from fastapi import APIRouter, FastAPI, Request, Body
+from fastapi import APIRouter, FastAPI, Request
 
 from bots.scripted_opponents import HuntTargetBot
 
@@ -14,22 +14,22 @@ from .health import readiness_payload
 from .model_loader import ModelLoader
 from .obs import Observability
 from .rate_limit import RateLimitExceeded, SimpleRateLimiter
-from .trainer_orchestrator import DummyTrainerOrchestrator, TrainerOrchestrator
 from .schemas import (
     AgentMove,
     ErrorResponse,
-    GameCreateRequest,
     GameConfig,
+    GameCreateRequest,
     GameStartResponse,
     MoveRequest,
     MoveResponse,
     MoveResult,
     PlayerType,
     QuitResponse,
+    TrainingMetricsResponse,
     TrainingRunCreateRequest,
     TrainingRunResponse,
-    TrainingMetricsResponse,
 )
+from .trainer_orchestrator import DummyTrainerOrchestrator, TrainerOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +56,12 @@ def _render_player_board(session: engine.GameSession) -> List[List[str]]:
 
 
 def _hits_and_misses(board_hits: dict) -> Tuple[set, set]:
-    hits = {coord for coord, outcome in board_hits.items() if outcome.value != engine.MoveOutcome.MISS}
-    misses = {coord for coord, outcome in board_hits.items() if outcome.value == engine.MoveOutcome.MISS}
+    hits = {
+        coord for coord, outcome in board_hits.items() if outcome.value != engine.MoveOutcome.MISS
+    }
+    misses = {
+        coord for coord, outcome in board_hits.items() if outcome.value == engine.MoveOutcome.MISS
+    }
     return hits, misses
 
 
@@ -65,7 +69,12 @@ def _random_unknown(board_hits: dict, board_size: int, seed: int | None) -> Tupl
     hits, misses = _hits_and_misses(board_hits)
     offset_seed = (seed + len(hits) + len(misses)) if seed is not None else None
     rng = random.Random(offset_seed)
-    choices = [(x, y) for x in range(board_size) for y in range(board_size) if (x, y) not in hits and (x, y) not in misses]
+    choices = [
+        (x, y)
+        for x in range(board_size)
+        for y in range(board_size)
+        if (x, y) not in hits and (x, y) not in misses
+    ]
     if not choices:
         raise engine.InvalidMove("no_available_moves")
     return rng.choice(choices)
@@ -82,13 +91,17 @@ def _make_policy(
     seed = deterministic_seed if deterministic_seed is not None else None
     if player_type == PlayerType.random_bot:
         return lambda session: _random_unknown(
-            session.agent_board_hits if target == "agent" else session.player_board_hits, session.board_size, seed
+            session.agent_board_hits if target == "agent" else session.player_board_hits,
+            session.board_size,
+            seed,
         )
     if player_type == PlayerType.heuristic_bot:
         bot = HuntTargetBot(board_size)
 
         def _heuristic(session: engine.GameSession) -> Tuple[int, int]:
-            hits, misses = _hits_and_misses(session.agent_board_hits if target == "agent" else session.player_board_hits)
+            hits, misses = _hits_and_misses(
+                session.agent_board_hits if target == "agent" else session.player_board_hits
+            )
             idx = bot.select_action((hits, misses))
             return (idx % session.board_size, idx // session.board_size)
 
@@ -96,59 +109,88 @@ def _make_policy(
             random.seed(deterministic_seed)
         return _heuristic
     if player_type == PlayerType.dqn_agent:
-        return lambda session: agent_adapter.next_move(session)
+        target_board: Literal["player", "agent"] = "agent" if role == "player" else "player"
+        return lambda session: agent_adapter.next_move(session, target=target_board)
     if player_type == PlayerType.human:
         raise ValueError("human player does not have an automated policy")
     raise ValueError(f"unknown player type {player_type}")
 
 
-def _auto_play(session: engine.GameSession, player_policy, agent_policy) -> engine.GameSession:
+def _auto_play(
+    session: engine.GameSession,
+    player_policy: Callable[[engine.GameSession], Tuple[int, int]],
+    agent_policy: Callable[[engine.GameSession], Tuple[int, int]],
+) -> engine.GameSession:
     while not session.is_finished():
-        player_move = player_policy(session)
-        engine.apply_player_move(session, player_move)
+        try:
+            player_move = player_policy(session)
+            engine.apply_player_move(session, player_move)
+        except engine.InvalidMove:
+            # Skip invalid/duplicate moves and continue auto-play.
+            continue
         if session.is_finished():
             break
-        agent_move = agent_policy(session)
-        engine.apply_agent_move(session, agent_move)
+        try:
+            agent_move = agent_policy(session)
+            engine.apply_agent_move(session, agent_move)
+        except engine.InvalidMove:
+            continue
     return session
 
 
-def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Observability, trainer_orchestrator: TrainerOrchestrator | None = None) -> APIRouter:
+def get_router(
+    app: FastAPI,
+    settings: Settings,
+    loader: ModelLoader,
+    obs: Observability,
+    trainer_orchestrator: TrainerOrchestrator | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["gameplay"])
     session_store = engine.InMemorySessionStore(settings.max_active_games, ttl_seconds=3600)
     policy_path = None
     if settings.model_path.exists() and settings.deterministic_mode is False:
         policy_path = settings.model_path
-    agent_adapter = agent.AgentAdapter(deterministic=settings.deterministic_mode, policy_path=policy_path)
-    trainer_orch = trainer_orchestrator or DummyTrainerOrchestrator()
+    agent_adapter = agent.AgentAdapter(
+        deterministic=settings.deterministic_mode, policy_path=policy_path
+    )
+    trainer_orch: TrainerOrchestrator = trainer_orchestrator or DummyTrainerOrchestrator()
     rate_limiter = SimpleRateLimiter(capacity=5, refill_rate_per_sec=1.0, retry_after=5)
-    rate_limit_hits = 0
 
     @router.post(
         "/games",
         response_model=GameStartResponse,
         responses={429: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
     )
-    def start_game(request: Request, payload: GameCreateRequest | None = Body(default=None)) -> GameStartResponse:
+    def start_game(request: Request, payload: GameCreateRequest | None = None) -> GameStartResponse:
         client_id = request.client.host if request.client else "anonymous"
         try:
             rate_limiter.allow(client_id)
         except RateLimitExceeded as exc:
             obs.rate_limit_hits.add(1)
-            raise_http("rate_limited", {"retry_after": exc.retry_after}, headers={"Retry-After": str(exc.retry_after)})
+            raise_http(
+                "rate_limited",
+                {"retry_after": exc.retry_after},
+                headers={"Retry-After": str(exc.retry_after)},
+            )
         if not loader.ready:
             raise_http("model_not_ready")
         payload = payload or GameCreateRequest()
         config = payload.config or GameConfig()
         if config.agent_type == PlayerType.human:
             raise_http("invalid_payload", {"reason": "agent_type cannot be human"})
-        if config.auto_play and (config.player_type == PlayerType.human or config.agent_type == PlayerType.human):
+        if config.auto_play and (
+            config.player_type == PlayerType.human or config.agent_type == PlayerType.human
+        ):
             raise_http("invalid_payload", {"reason": "auto_play requires both players to be bots"})
         with obs.span("game.start"):
             try:
                 if payload.placements:
                     ships = [
-                        engine.Ship(name=p.name, size=len(p.coordinates), coordinates=[tuple(c) for c in p.coordinates])
+                        engine.Ship(
+                            name=p.name,
+                            size=len(p.coordinates),
+                            coordinates=[(int(c[0]), int(c[1])) for c in p.coordinates],
+                        )
                         for p in payload.placements
                     ]
                     engine.validate_placements(settings.board_size, ships)
@@ -157,7 +199,9 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
                         placements=ships,
                         deterministic_seed=settings.deterministic_mode and 0 or None,
                         config=engine.GameConfig(
-                            player_type=config.player_type, agent_type=config.agent_type, auto_play=config.auto_play
+                            player_type=config.player_type,
+                            agent_type=config.agent_type,
+                            auto_play=config.auto_play,
                         ),
                     )
                     session_store.add(session)
@@ -166,7 +210,9 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
                         board_size=settings.board_size,
                         deterministic_seed=settings.deterministic_mode and 0 or None,
                         config=engine.GameConfig(
-                            player_type=config.player_type, agent_type=config.agent_type, auto_play=config.auto_play
+                            player_type=config.player_type,
+                            agent_type=config.agent_type,
+                            auto_play=config.auto_play,
                         ),
                     )
             except engine.InvalidMove as exc:
@@ -174,15 +220,29 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
 
         if config.auto_play:
             try:
-                player_policy = _make_policy(config.player_type, "player", settings.board_size, session.deterministic_seed, agent_adapter)
-                agent_policy = _make_policy(config.agent_type, "agent", settings.board_size, session.deterministic_seed, agent_adapter)
+                player_policy = _make_policy(
+                    config.player_type,
+                    "player",
+                    settings.board_size,
+                    session.deterministic_seed,
+                    agent_adapter,
+                )
+                agent_policy = _make_policy(
+                    config.agent_type,
+                    "agent",
+                    settings.board_size,
+                    session.deterministic_seed,
+                    agent_adapter,
+                )
                 session = _auto_play(session, player_policy, agent_policy)
             except Exception as exc:
                 session.status = engine.GameStatus.ABORTED
                 raise_http("inference_failed", {"reason": str(exc)})
 
         player_board = _render_player_board(session)
-        agent_board = _render_hits(settings.board_size, session.agent_board_hits if config.auto_play else {})
+        agent_board = _render_hits(
+            settings.board_size, session.agent_board_hits if config.auto_play else {}
+        )
         return GameStartResponse(
             game_id=session.game_id,
             board=player_board,
@@ -216,7 +276,11 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
             rate_limiter.allow(client_id)
         except RateLimitExceeded as exc:
             obs.rate_limit_hits.add(1)
-            raise_http("rate_limited", {"retry_after": exc.retry_after}, headers={"Retry-After": str(exc.retry_after)})
+            raise_http(
+                "rate_limited",
+                {"retry_after": exc.retry_after},
+                headers={"Retry-After": str(exc.retry_after)},
+            )
 
         if not loader.ready:
             raise_http("model_not_ready")
@@ -233,7 +297,9 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
             try:
                 infer_start = time.perf_counter()
                 if session.config.agent_type == PlayerType.random_bot:
-                    agent_coord = _random_unknown(session.player_board_hits, session.board_size, session.deterministic_seed)
+                    agent_coord = _random_unknown(
+                        session.player_board_hits, session.board_size, session.deterministic_seed
+                    )
                 elif session.config.agent_type == PlayerType.heuristic_bot:
                     bot = HuntTargetBot(session.board_size)
                     hits, misses = _hits_and_misses(session.player_board_hits)
@@ -286,11 +352,21 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         response_model=TrainingRunResponse,
         responses={503: {"model": ErrorResponse}},
     )
-    def start_training(request: Request, payload: TrainingRunCreateRequest | None = Body(default=None)) -> TrainingRunResponse:
+    def start_training(
+        request: Request, payload: TrainingRunCreateRequest | None = None
+    ) -> TrainingRunResponse:
         cfg = payload.config if payload else {}
         run = trainer_orch.start_run(cfg or {})
-        logger.info("training run requested", extra={"run_id": run.run_id, "client": request.client.host if request.client else "unknown"})
-        return TrainingRunResponse(run_id=run.run_id, status=run.status, config=run.config, error=run.error)
+        logger.info(
+            "training run requested",
+            extra={
+                "run_id": run.run_id,
+                "client": request.client.host if request.client else "unknown",
+            },
+        )
+        return TrainingRunResponse(
+            run_id=run.run_id, status=run.status, config=run.config, error=run.error
+        )
 
     @router.get(
         "/training/runs/{run_id}",
@@ -301,7 +377,10 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         run = trainer_orch.get_run(run_id)
         if not run:
             raise_http("training_not_found")
-        return TrainingRunResponse(run_id=run.run_id, status=run.status, config=run.config, error=run.error)
+        assert run is not None
+        return TrainingRunResponse(
+            run_id=run.run_id, status=run.status, config=run.config, error=run.error
+        )
 
     @router.post(
         "/training/runs/{run_id}/cancel",
@@ -312,7 +391,10 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         run = trainer_orch.cancel_run(run_id)
         if not run:
             raise_http("training_not_found")
-        return TrainingRunResponse(run_id=run.run_id, status=run.status, config=run.config, error=run.error)
+        assert run is not None
+        return TrainingRunResponse(
+            run_id=run.run_id, status=run.status, config=run.config, error=run.error
+        )
 
     @router.get(
         "/training/runs/{run_id}/metrics",
@@ -323,6 +405,7 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         metrics = trainer_orch.get_metrics(run_id)
         if metrics is None:
             raise_http("training_not_found")
+        assert metrics is not None
         return TrainingMetricsResponse(run_id=run_id, metrics=metrics)
 
     return router

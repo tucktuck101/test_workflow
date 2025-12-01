@@ -25,7 +25,7 @@ def _extract_masks(board, board_size: int):
         import numpy as np
 
         ys, xs = np.nonzero(hits)
-        hits_set.update(zip(xs.tolist(), ys.tolist()))
+        hits_set.update(zip(xs.tolist(), ys.tolist(), strict=False))
     else:
         hits_set.update(hits)
 
@@ -33,7 +33,7 @@ def _extract_masks(board, board_size: int):
         import numpy as np
 
         ys, xs = np.nonzero(misses)
-        miss_set.update(zip(xs.tolist(), ys.tolist()))
+        miss_set.update(zip(xs.tolist(), ys.tolist(), strict=False))
     else:
         miss_set.update(misses)
 
@@ -187,7 +187,9 @@ class HuntTargetBot:
 class ProbabilityBot:
     def __init__(self, board_size: int, remaining_ships: Sequence[int] | None = None):
         self.board_size = board_size
-        self.remaining_ships = list(remaining_ships) if remaining_ships is not None else [5, 4, 3, 3, 2]
+        self.remaining_ships = (
+            list(remaining_ships) if remaining_ships is not None else [5, 4, 3, 3, 2]
+        )
         self.target_bot = HuntTargetBot(board_size)
 
     def _score_board(self, hits_set: set[Coordinate], miss_set: set[Coordinate]) -> List[int]:
@@ -218,7 +220,7 @@ class ProbabilityBot:
 
     def select_action(self, board) -> int:
         unknown_mask, hits_set = _extract_masks(board, self.board_size)
-        miss_set = set()
+        miss_set: set[Coordinate] = set()
         if isinstance(board, (list, tuple)) and len(board) >= 2:
             misses = board[1]
         else:
@@ -228,7 +230,7 @@ class ProbabilityBot:
                 import numpy as np
 
                 ys, xs = np.nonzero(misses)
-                miss_set.update(zip(xs.tolist(), ys.tolist()))
+                miss_set.update(zip(xs.tolist(), ys.tolist(), strict=False))
             else:
                 miss_set.update(misses)
 

@@ -6,17 +6,20 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, root_validator, validator
-
+from pydantic import BaseModel, Field, ValidationError, model_validator, validator
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CURRICULUM_PATH = REPO_ROOT / "configs" / "curriculum.default.yaml"
 
 
 class OpponentMix(BaseModel):
-    opponent: str = Field(..., description="opponent type identifier (e.g., random, hunt_target, probability)")
+    opponent: str = Field(
+        ..., description="opponent type identifier (e.g., random, hunt_target, probability)"
+    )
     weight: float = Field(..., gt=0, description="relative probability of sampling this opponent")
-    params: Dict[str, object] = Field(default_factory=dict, description="optional opponent-specific parameters")
+    params: Dict[str, object] = Field(
+        default_factory=dict, description="optional opponent-specific parameters"
+    )
 
     @validator("opponent")
     def opponent_not_empty(cls, v: str) -> str:
@@ -26,11 +29,21 @@ class OpponentMix(BaseModel):
 
 
 class GatingConditions(BaseModel):
-    min_episodes: int = Field(0, ge=0, description="minimum number of episodes before evaluating this phase")
-    min_rounds: Optional[int] = Field(None, ge=0, description="minimum completed rounds before unlocking")
-    min_win_rate: float = Field(0.0, ge=0.0, le=1.0, description="required win rate (0-1) to advance")
-    min_avg_moves: Optional[float] = Field(None, gt=0, description="maximum average moves allowed to advance")
-    min_baseline_win_rate: Optional[float] = Field(None, ge=0.0, le=1.0, description="baseline win rate gate (0-1)")
+    min_episodes: int = Field(
+        0, ge=0, description="minimum number of episodes before evaluating this phase"
+    )
+    min_rounds: Optional[int] = Field(
+        None, ge=0, description="minimum completed rounds before unlocking"
+    )
+    min_win_rate: float = Field(
+        0.0, ge=0.0, le=1.0, description="required win rate (0-1) to advance"
+    )
+    min_avg_moves: Optional[float] = Field(
+        None, gt=0, description="maximum average moves allowed to advance"
+    )
+    min_baseline_win_rate: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="baseline win rate gate (0-1)"
+    )
 
 
 class TrainOverrides(BaseModel):
@@ -86,9 +99,15 @@ class SelfPlayOverrides(BaseModel):
 
 
 class PhaseHyperParams(BaseModel):
-    train: Optional[TrainOverrides] = Field(default=None, description="per-phase overrides for TrainConfig")
-    dqn: Optional[DQNOverrides] = Field(default=None, description="per-phase overrides for DQNConfig")
-    selfplay: Optional[SelfPlayOverrides] = Field(default=None, description="per-phase overrides for SelfPlayConfig")
+    train: Optional[TrainOverrides] = Field(
+        default=None, description="per-phase overrides for TrainConfig"
+    )
+    dqn: Optional[DQNOverrides] = Field(
+        default=None, description="per-phase overrides for DQNConfig"
+    )
+    selfplay: Optional[SelfPlayOverrides] = Field(
+        default=None, description="per-phase overrides for SelfPlayConfig"
+    )
 
 
 class CurriculumPhase(BaseModel):
@@ -96,7 +115,9 @@ class CurriculumPhase(BaseModel):
     name: str = Field(..., description="human readable phase name")
     description: str = Field(..., description="short explanation of the phase goals")
     gating: GatingConditions
-    opponents: List[OpponentMix] = Field(default_factory=list, description="opponent mixture for this phase")
+    opponents: List[OpponentMix] = Field(
+        default_factory=list, description="opponent mixture for this phase"
+    )
     hyperparams: PhaseHyperParams = Field(default_factory=PhaseHyperParams)
 
     @validator("id", "name", "description")
@@ -125,15 +146,15 @@ class CurriculumConfig(BaseModel):
             raise ValueError("at least one curriculum phase is required")
         return v
 
-    @root_validator
-    def ensure_unique_ids(cls, values):
-        phases: List[CurriculumPhase] = values.get("phases") or []
+    @model_validator(mode="after")
+    def ensure_unique_ids(self) -> "CurriculumConfig":
+        phases: List[CurriculumPhase] = self.phases or []
         seen = set()
         for phase in phases:
             if phase.id in seen:
                 raise ValueError(f"duplicate phase id '{phase.id}'")
             seen.add(phase.id)
-        return values
+        return self
 
 
 def _load_yaml(path: Path) -> dict:
@@ -208,7 +229,9 @@ class CurriculumState:
         self.progress.episodes += episodes
         self.total_episodes += episodes
 
-    def record_round(self, win_rate: float, avg_moves: Optional[float], baseline_wr: Optional[float]) -> None:
+    def record_round(
+        self, win_rate: float, avg_moves: Optional[float], baseline_wr: Optional[float]
+    ) -> None:
         self.progress.rounds += 1
         self.total_rounds += 1
         self.progress.last_win_rate = win_rate
@@ -222,13 +245,22 @@ class CurriculumState:
         if gating.min_rounds and self.progress.rounds < gating.min_rounds:
             return False
         if gating.min_win_rate is not None:
-            if self.progress.last_win_rate is None or self.progress.last_win_rate < gating.min_win_rate:
+            if (
+                self.progress.last_win_rate is None
+                or self.progress.last_win_rate < gating.min_win_rate
+            ):
                 return False
         if gating.min_avg_moves is not None:
-            if self.progress.last_avg_moves is None or self.progress.last_avg_moves > gating.min_avg_moves:
+            if (
+                self.progress.last_avg_moves is None
+                or self.progress.last_avg_moves > gating.min_avg_moves
+            ):
                 return False
         if gating.min_baseline_win_rate is not None:
-            if self.progress.last_baseline_win_rate is None or self.progress.last_baseline_win_rate < gating.min_baseline_win_rate:
+            if (
+                self.progress.last_baseline_win_rate is None
+                or self.progress.last_baseline_win_rate < gating.min_baseline_win_rate
+            ):
                 return False
         return True
 
