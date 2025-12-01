@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE, fetchReadiness, makeMove, mapError, quitGame, startGame } from './api';
+import { TrainingControl } from './TrainingControl';
 import type { CellState, GameStatus, MoveResponse, PlayerType, ReadyResponse } from './types';
 
 interface BoardProps {
@@ -89,6 +90,7 @@ function App() {
   const [placementMap, setPlacementMap] = useState<Record<string, number[][]>>({});
   const [currentShipIdx, setCurrentShipIdx] = useState(0);
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [view, setView] = useState<'play' | 'train'>('play');
 
   useEffect(() => {
     fetchReadiness()
@@ -296,6 +298,14 @@ function App() {
       </header>
 
       <div className="card" style={{ marginBottom: 16 }}>
+        <div className="controls" style={{ gap: 8 }}>
+          <button className={`button ${view === 'play' ? '' : 'secondary'}`} onClick={() => setView('play')}>Play</button>
+          <button className={`button ${view === 'train' ? '' : 'secondary'}`} onClick={() => setView('train')}>Training</button>
+        </div>
+      </div>
+
+      {view === 'play' && (
+      <div className="card" style={{ marginBottom: 16 }}>
         <div className="controls" style={{ gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <label htmlFor="player-type">You</label>
@@ -381,43 +391,52 @@ function App() {
           </div>
         )}
       </div>
+      )}
 
-      <div className="board-wrap" aria-live="polite">
-        <Board
-          grid={playerGrid}
-          label={placementMode ? 'Your Board (place your ships)' : 'Your Board (your fleet)'}
-          disabled={Boolean(gameId) && !placementMode}
-          onCellClick={placementMode ? placeShip : undefined}
-        />
-        <Board
-          grid={agentBoard}
-          label={autoPlay ? 'Agent Board (auto-played)' : 'Agent Board (click to fire)'}
-          disabled={moveDisabled}
-          onCellClick={autoPlay ? undefined : handleMove}
-        />
-      </div>
+      {view === 'play' && (
+        <>
+          <div className="board-wrap" aria-live="polite">
+            <Board
+              grid={playerGrid}
+              label={placementMode ? 'Your Board (place your ships)' : 'Your Board (your fleet)'}
+              disabled={Boolean(gameId) && !placementMode}
+              onCellClick={placementMode ? placeShip : undefined}
+            />
+            <Board
+              grid={agentBoard}
+              label={autoPlay ? 'Agent Board (auto-played)' : 'Agent Board (click to fire)'}
+              disabled={moveDisabled}
+              onCellClick={autoPlay ? undefined : handleMove}
+            />
+          </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="status-line" style={{ marginBottom: 8 }}>
-          <strong>Event log</strong>
-        </div>
-        <div className="log" aria-live="polite">
-          {logs.length === 0 && <div className="message warn">No actions yet.</div>}
-          {logs.map((entry, idx) => (
-            <div key={idx} className={`message ${entry.tone === 'warn' ? 'warn' : entry.tone}`}>{entry.message}</div>
-          ))}
-        </div>
-      </div>
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="status-line" style={{ marginBottom: 8 }}>
+              <strong>Event log</strong>
+            </div>
+            <div className="log" aria-live="polite">
+              {logs.length === 0 && <div className="message warn">No actions yet.</div>}
+              {logs.map((entry, idx) => (
+                <div key={idx} className={`message ${entry.tone === 'warn' ? 'warn' : entry.tone}`}>{entry.message}</div>
+              ))}
+            </div>
+          </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <strong>Player types</strong>
-        <ul style={{ marginTop: 6, paddingLeft: 18, color: 'var(--muted)' }}>
-          <li><strong>Human</strong>: you place ships and fire shots manually.</li>
-          <li><strong>Random Bot</strong>: fires uniformly at unknown cells.</li>
-          <li><strong>Heuristic Bot</strong>: hunt/target strategy that chases hits.</li>
-          <li><strong>DQN Agent</strong>: uses the loaded RL model for moves.</li>
-        </ul>
-      </div>
+          <div className="card" style={{ marginTop: 12 }}>
+            <strong>Player types</strong>
+            <ul style={{ marginTop: 6, paddingLeft: 18, color: 'var(--muted)' }}>
+              <li><strong>Human</strong>: you place ships and fire shots manually.</li>
+              <li><strong>Random Bot</strong>: fires uniformly at unknown cells.</li>
+              <li><strong>Heuristic Bot</strong>: hunt/target strategy that chases hits.</li>
+              <li><strong>DQN Agent</strong>: uses the loaded RL model for moves.</li>
+            </ul>
+          </div>
+        </>
+      )}
+
+      {view === 'train' && (
+        <TrainingControl onError={(msg) => setError(msg)} />
+      )}
     </div>
   );
 }

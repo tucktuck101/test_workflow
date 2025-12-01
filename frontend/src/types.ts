@@ -4,6 +4,8 @@ export type PlayerType = 'human' | 'random_bot' | 'heuristic_bot' | 'dqn_agent';
 
 export type CellState = 'unknown' | 'miss' | 'hit' | 'sunk' | 'ship';
 
+export type TrainingRunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
+
 export interface GameStartResponse {
   game_id: string;
   board: CellState[][];
@@ -33,6 +35,13 @@ export interface QuitResponse {
   status: 'ended';
 }
 
+export interface TrainingRunResponse {
+  run_id: string;
+  status: TrainingRunStatus;
+  config: Record<string, unknown>;
+  error?: string | null;
+}
+
 export type ErrorCode =
   | 'invalid_coordinates'
   | 'duplicate_move'
@@ -43,6 +52,7 @@ export type ErrorCode =
   | 'model_not_ready'
   | 'inference_failed'
   | 'no_available_moves'
+  | 'training_not_found'
   | 'invalid_payload'
   | 'path_invalid'
   | 'hash_mismatch'

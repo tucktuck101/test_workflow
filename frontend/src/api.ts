@@ -7,6 +7,7 @@ import type {
   ReadyResponse,
   ApiError,
   PlayerType,
+  TrainingRunResponse,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -62,6 +63,25 @@ export async function quitGame(gameId: string): Promise<QuitResponse> {
   return handle<QuitResponse>(res);
 }
 
+export async function startTraining(config: Record<string, unknown>): Promise<TrainingRunResponse> {
+  const res = await fetch(buildUrl('/api/training/runs'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config }),
+  });
+  return handle<TrainingRunResponse>(res);
+}
+
+export async function getTraining(runId: string): Promise<TrainingRunResponse> {
+  const res = await fetch(buildUrl(`/api/training/runs/${runId}`));
+  return handle<TrainingRunResponse>(res);
+}
+
+export async function cancelTraining(runId: string): Promise<TrainingRunResponse> {
+  const res = await fetch(buildUrl(`/api/training/runs/${runId}/cancel`), { method: 'POST' });
+  return handle<TrainingRunResponse>(res);
+}
+
 export function mapError(err: ApiError): { tone: 'error' | 'warn'; message: string } {
   const retry = err.error_code === 'rate_limited' || err.error_code === 'model_not_ready';
   const backoff = retry ? ' Please retry in a few seconds.' : '';
@@ -75,6 +95,7 @@ export function mapError(err: ApiError): { tone: 'error' | 'warn'; message: stri
     model_not_ready: 'Model not ready yet.',
     inference_failed: 'Agent move failed.',
     no_available_moves: 'No moves remain.',
+    training_not_found: 'Training run not found.',
     invalid_payload: 'Request was invalid.',
     path_invalid: 'Model path invalid.',
     hash_mismatch: 'Model hash mismatch.',

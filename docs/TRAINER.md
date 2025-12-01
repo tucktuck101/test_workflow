@@ -47,3 +47,6 @@ docker run --rm -v $(pwd)/artifacts:/app/artifacts -v $(pwd)/configs:/app/config
   - `POST /api/training/runs/{id}/cancel` to cancel.
 - Status values: `pending`, `running`, `succeeded`, `failed`, `canceled`.
 - Current orchestrator is a dummy/local simulator; Compose/K8s stubs are present to extend as needed.
+
+## UI training control
+- Frontend includes a Training page with YAML editor/upload, start/cancel controls, and run status display (backed by the endpoints above).
