@@ -84,5 +84,10 @@ class TrainingRunResponse(BaseModel):
     error: Optional[str] = None
 
 
+class TrainingMetricsResponse(BaseModel):
+    run_id: str
+    metrics: dict
+
+
 class TrainingRunCreateRequest(BaseModel):
     config: dict | None = None

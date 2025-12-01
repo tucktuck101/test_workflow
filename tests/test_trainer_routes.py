@@ -63,3 +63,14 @@ def test_training_run_failure(tmp_path):
     status = client.get(f"/api/training/runs/{run_id}")
     assert status.status_code == 200
     assert status.json()["status"] in {"failed", "running"}
+
+
+def test_training_metrics(tmp_path):
+    client = _make_app(tmp_path)
+    resp = client.post("/api/training/runs", json={"config": {"epochs": 1}})
+    run_id = resp.json()["run_id"]
+    metrics_resp = client.get(f"/api/training/runs/{run_id}/metrics")
+    assert metrics_resp.status_code == 200
+    body = metrics_resp.json()
+    assert body["run_id"] == run_id
+    assert "episodes" in body["metrics"]

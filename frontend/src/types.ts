@@ -42,6 +42,17 @@ export interface TrainingRunResponse {
   error?: string | null;
 }
 
+export interface TrainingMetricsResponse {
+  run_id: string;
+  metrics: {
+    episodes?: number;
+    win_rate?: number;
+    loss?: number;
+    curriculum_phase?: string;
+    [key: string]: unknown;
+  };
+}
+
 export type ErrorCode =
   | 'invalid_coordinates'
   | 'duplicate_move'

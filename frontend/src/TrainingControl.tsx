@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import YAML from 'js-yaml';
-import { cancelTraining, getTraining, mapError, startTraining } from './api';
-import type { TrainingRunResponse, TrainingRunStatus } from './types';
+import { cancelTraining, getTraining, getTrainingMetrics, mapError, startTraining } from './api';
+import type { TrainingMetricsResponse, TrainingRunResponse, TrainingRunStatus } from './types';
 
 const SAMPLE_YAML = `# Example trainer config
 train:
@@ -20,10 +20,35 @@ export function TrainingControl({ onError }: Props) {
   const [status, setStatus] = useState<TrainingRunStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<TrainingMetricsResponse['metrics'] | null>(null);
+  const [metricHistory, setMetricHistory] = useState<number[]>([]);
 
   useEffect(() => {
     setStatus(run?.status ?? null);
   }, [run]);
+
+  useEffect(() => {
+    let interval: number | undefined;
+    if (run && status && ['pending', 'running'].includes(status)) {
+      interval = window.setInterval(() => {
+        getTrainingMetrics(run.run_id)
+          .then((res) => {
+            setMetrics(res.metrics);
+            if (typeof res.metrics.win_rate === 'number') {
+              setMetricHistory((prev) => [...prev.slice(-20), res.metrics.win_rate as number]);
+            }
+          })
+          .catch((err) => {
+            const mapped = mapError(err);
+            setMessage(mapped.message);
+            onError?.(mapped.message);
+          });
+      }, 2000);
+    }
+    return () => {
+      if (interval) window.clearInterval(interval);
+    };
+  }, [run, status]);
 
   function parseYaml(): Record<string, unknown> | null {
     try {
@@ -50,6 +75,8 @@ export function TrainingControl({ onError }: Props) {
       const res = await startTraining(config);
       setRun(res);
       setStatus(res.status);
+      setMetrics(null);
+      setMetricHistory([]);
       setMessage(`Started training run ${res.run_id}`);
     } catch (err: any) {
       const mapped = mapError(err);
@@ -95,6 +122,26 @@ export function TrainingControl({ onError }: Props) {
   }
 
   const statusBadge = status ? status.toUpperCase() : 'Idle';
+  const winRate = metrics?.win_rate ?? null;
+  const episodes = metrics?.episodes ?? null;
+  const loss = metrics?.loss ?? null;
+  const phase = metrics?.curriculum_phase ?? null;
+
+  const sparklinePath = useMemo(() => {
+    if (metricHistory.length === 0) return '';
+    const max = Math.max(...metricHistory, 1);
+    const min = Math.min(...metricHistory, 0);
+    const width = 100;
+    const height = 30;
+    const step = width / Math.max(metricHistory.length - 1, 1);
+    return metricHistory
+      .map((val, idx) => {
+        const x = idx * step;
+        const y = height - ((val - min) / (max - min || 1)) * height;
+        return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      })
+      .join(' ');
+  }, [metricHistory]);
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
@@ -132,6 +179,34 @@ export function TrainingControl({ onError }: Props) {
           {message}
         </div>
       )}
+      <div className="status-line" style={{ marginTop: 12, gap: 12, flexWrap: 'wrap' }}>
+        <div className="card mini">
+          <div className="label">Episodes</div>
+          <div className="value">{episodes ?? '—'}</div>
+        </div>
+        <div className="card mini">
+          <div className="label">Win rate</div>
+          <div className="value">{winRate !== null ? `${(winRate as number * 100).toFixed(1)}%` : '—'}</div>
+        </div>
+        <div className="card mini">
+          <div className="label">Loss</div>
+          <div className="value">{loss !== null ? (loss as number).toFixed(3) : '—'}</div>
+        </div>
+        <div className="card mini">
+          <div className="label">Curriculum</div>
+          <div className="value">{phase ?? '—'}</div>
+        </div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <div className="label">Win rate trend</div>
+        {metricHistory.length === 0 ? (
+          <div className="message warn" style={{ marginTop: 6 }}>No metrics yet.</div>
+        ) : (
+          <svg width="100%" height="40" viewBox="0 0 100 30" preserveAspectRatio="none">
+            <path d={sparklinePath} stroke="var(--accent)" fill="none" strokeWidth="1.5" />
+          </svg>
+        )}
+      </div>
     </div>
   );
 }

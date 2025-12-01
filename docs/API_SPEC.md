@@ -100,6 +100,7 @@ Auth: none (anonymous MVP).
 - `POST /api/training/runs`: start a trainer run. Body: `{ "config": { ... } }` (optional). Response: `{ "run_id": "...", "status": "pending|running|succeeded|failed|canceled", "config": {...}, "error": null }`.
 - `GET /api/training/runs/{id}`: fetch run status.
 - `POST /api/training/runs/{id}/cancel`: cancel an in-flight run.
+- `GET /api/training/runs/{id}/metrics`: return metrics for the run (episodes, win_rate, loss, curriculum_phase, etc.).
 - Errors: `training_not_found` (404) for unknown run ids, `invalid_payload` (400) for bad requests.
 
 ## Rate Limits & Backoff (planned)

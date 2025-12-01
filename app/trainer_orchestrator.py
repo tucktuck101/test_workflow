@@ -24,6 +24,7 @@ class TrainerRun:
     status: RunStatus
     config: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
+    metrics: Dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -35,7 +36,7 @@ class InMemoryRunStore:
 
     def create(self, config: Dict[str, Any]) -> TrainerRun:
         run_id = str(uuid.uuid4())
-        run = TrainerRun(run_id=run_id, status=RunStatus.PENDING, config=config or {})
+        run = TrainerRun(run_id=run_id, status=RunStatus.PENDING, config=config or {}, metrics={"episodes": 0, "win_rate": 0.0, "loss": 0.0, "curriculum_phase": "bootcamp"})
         with self._lock:
             self._runs[run_id] = run
         return run
@@ -58,6 +59,16 @@ class InMemoryRunStore:
             self._runs[run_id] = run
             return run
 
+    def update_metrics(self, run_id: str, metrics: Dict[str, Any]) -> Optional[TrainerRun]:
+        with self._lock:
+            run = self._runs.get(run_id)
+            if not run:
+                return None
+            run.metrics.update(metrics)
+            run.updated_at = time.time()
+            self._runs[run_id] = run
+            return run
+
 
 class TrainerOrchestrator:
     def start_run(self, config: Dict[str, Any] | None = None) -> TrainerRun:  # pragma: no cover - interface
@@ -67,6 +78,9 @@ class TrainerOrchestrator:
         raise NotImplementedError
 
     def cancel_run(self, run_id: str) -> Optional[TrainerRun]:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    def get_metrics(self, run_id: str) -> Optional[Dict[str, Any]]:  # pragma: no cover - interface
         raise NotImplementedError
 
 
@@ -87,6 +101,8 @@ class DummyTrainerOrchestrator(TrainerOrchestrator):
             current = self.store.get(run.run_id)
             if not current or current.status != RunStatus.RUNNING:
                 return
+            # update some dummy metrics
+            self.store.update_metrics(run.run_id, {"episodes": 10, "win_rate": 0.6, "loss": 0.4, "curriculum_phase": "bootcamp"})
             if config.get("fail"):
                 self.store.update_status(run.run_id, RunStatus.FAILED, error="simulated_failure")
                 log.error("trainer run failed", extra={"run_id": run.run_id})
@@ -112,6 +128,12 @@ class DummyTrainerOrchestrator(TrainerOrchestrator):
         log.info("trainer run canceled", extra={"run_id": run_id})
         return updated
 
+    def get_metrics(self, run_id: str) -> Optional[Dict[str, Any]]:
+        run = self.store.get(run_id)
+        if not run:
+            return None
+        return run.metrics
+
 
 class ComposeTrainerOrchestrator(TrainerOrchestrator):
     """Placeholder for docker-compose orchestration."""
@@ -129,6 +151,10 @@ class ComposeTrainerOrchestrator(TrainerOrchestrator):
     def cancel_run(self, run_id: str) -> Optional[TrainerRun]:
         return DummyTrainerOrchestrator(self.store).cancel_run(run_id)
 
+    def get_metrics(self, run_id: str) -> Optional[Dict[str, Any]]:
+        run = self.store.get(run_id)
+        return run.metrics if run else None
+
 
 class KubernetesTrainerOrchestrator(TrainerOrchestrator):
     """Placeholder for k8s job orchestration."""
@@ -145,3 +171,7 @@ class KubernetesTrainerOrchestrator(TrainerOrchestrator):
 
     def cancel_run(self, run_id: str) -> Optional[TrainerRun]:
         return DummyTrainerOrchestrator(self.store).cancel_run(run_id)
+
+    def get_metrics(self, run_id: str) -> Optional[Dict[str, Any]]:
+        run = self.store.get(run_id)
+        return run.metrics if run else None

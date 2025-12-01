@@ -28,6 +28,7 @@ from .schemas import (
     QuitResponse,
     TrainingRunCreateRequest,
     TrainingRunResponse,
+    TrainingMetricsResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -312,6 +313,17 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
         if not run:
             raise_http("training_not_found")
         return TrainingRunResponse(run_id=run.run_id, status=run.status, config=run.config, error=run.error)
+
+    @router.get(
+        "/training/runs/{run_id}/metrics",
+        response_model=TrainingMetricsResponse,
+        responses={404: {"model": ErrorResponse}},
+    )
+    def training_metrics(run_id: str) -> TrainingMetricsResponse:
+        metrics = trainer_orch.get_metrics(run_id)
+        if metrics is None:
+            raise_http("training_not_found")
+        return TrainingMetricsResponse(run_id=run_id, metrics=metrics)
 
     return router
 
