@@ -37,6 +37,7 @@ class Settings:
     api_host: str
     api_port: int
     frontend_origin: Optional[str]
+    training_frontend_origin: Optional[str]
     model_root: Path
     model_path: Path
     model_version: str
@@ -55,6 +56,7 @@ class Settings:
         api_host = env.get("API_HOST", "0.0.0.0")
         api_port = _parse_int(env.get("API_PORT", "8000"), "API_PORT", min_value=1)
         frontend_origin = env.get("FRONTEND_ORIGIN")
+        training_frontend_origin = env.get("TRAINING_FRONTEND_ORIGIN")
 
         model_path_raw = env.get("MODEL_PATH")
         if not model_path_raw:
@@ -110,4 +112,5 @@ class Settings:
             observability_enabled=observability_enabled,
             deterministic_mode=deterministic_mode,
             max_active_games=max_active_games,
+            training_frontend_origin=training_frontend_origin,
         )

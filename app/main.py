@@ -13,10 +13,11 @@ from .obs import Observability
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     app = FastAPI(title="Battleship RL API", version=settings.model_version)
-    if settings.frontend_origin:
+    origins = [o for o in [settings.frontend_origin, settings.training_frontend_origin] if o]
+    if origins:
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=[settings.frontend_origin],
+            allow_origins=origins,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],

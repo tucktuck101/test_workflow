@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:training": "tsc && vite build --config vite.training.config.ts",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",

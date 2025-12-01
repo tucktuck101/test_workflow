@@ -40,8 +40,14 @@
 - Concurrency/resource protection: `MAX_ACTIVE_GAMES` cap to avoid memory exhaustion; consider autoscaling on move latency and active games metrics.
 
 ## Docker Compose (local)
-- `docker compose up --build` runs backend + frontend. Environment defaults to stub model hash/version; readiness is wired to compose healthcheck.
-- Frontend uses `VITE_API_BASE_URL=http://backend:8000` in compose for service-to-service calls.
+- `docker compose up --build` runs backend + gameplay frontend + training UI. Environment defaults to stub model hash/version; readiness is wired to compose healthcheck.
+- Gameplay UI uses `VITE_API_BASE_URL=http://backend:8000`; Training UI uses the same API base.
+- CORS: set `FRONTEND_ORIGIN` (game UI) and `TRAINING_FRONTEND_ORIGIN` (training UI) on the backend.
+
+## Split UIs
+- Gameplay UI (port 3000) and Training UI (port 3001) are separate containers.
+- Navigation: gameplay UI header links to the training UI; gameplay continues to work if training UI is down.
+- Trainer UI build: `npm run build:training` or `docker build -f Dockerfile.training-frontend -t training-ui .`
 
 ## Deterministic/Test Modes
 - `DETERMINISTIC_MODE=true` enables stubbed/deterministic agent and seeds; use only for tests/local debugging. Production should set false and rely on real model.

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE, fetchReadiness, makeMove, mapError, quitGame, startGame } from './api';
-import { TrainingControl } from './TrainingControl';
 import type { CellState, GameStatus, MoveResponse, PlayerType, ReadyResponse } from './types';
 
 interface BoardProps {
@@ -90,7 +89,7 @@ function App() {
   const [placementMap, setPlacementMap] = useState<Record<string, number[][]>>({});
   const [currentShipIdx, setCurrentShipIdx] = useState(0);
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
-  const [view, setView] = useState<'play' | 'train'>('play');
+  const trainingUiUrl = import.meta.env.VITE_TRAINING_UI_URL;
 
   useEffect(() => {
     fetchReadiness()
@@ -298,14 +297,6 @@ function App() {
       </header>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="controls" style={{ gap: 8 }}>
-          <button className={`button ${view === 'play' ? '' : 'secondary'}`} onClick={() => setView('play')}>Play</button>
-          <button className={`button ${view === 'train' ? '' : 'secondary'}`} onClick={() => setView('train')}>Training</button>
-        </div>
-      </div>
-
-      {view === 'play' && (
-      <div className="card" style={{ marginBottom: 16 }}>
         <div className="controls" style={{ gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <label htmlFor="player-type">You</label>
@@ -390,10 +381,13 @@ function App() {
             {error}
           </div>
         )}
+        {trainingUiUrl && (
+          <p style={{ marginTop: 8, fontSize: 13 }}>
+            Training UI: <a href={trainingUiUrl}>Open training controls</a>
+          </p>
+        )}
       </div>
-      )}
 
-      {view === 'play' && (
         <>
           <div className="board-wrap" aria-live="polite">
             <Board
@@ -432,11 +426,6 @@ function App() {
             </ul>
           </div>
         </>
-      )}
-
-      {view === 'train' && (
-        <TrainingControl onError={(msg) => setError(msg)} />
-      )}
     </div>
   );
 }
