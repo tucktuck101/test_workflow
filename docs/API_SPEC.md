@@ -96,6 +96,12 @@ Auth: none (anonymous MVP).
 - Response 200: `{ "status": "ready", "model_version": "vX", "model_hash": "...", "device": "cpu|cuda" }`
 - Response 503 with error details when model failed to load, missing artifact, hash mismatch, configuration invalid, or critical dependencies unavailable.
 
+## Trainer lifecycle
+- `POST /api/training/runs`: start a trainer run. Body: `{ "config": { ... } }` (optional). Response: `{ "run_id": "...", "status": "pending|running|succeeded|failed|canceled", "config": {...}, "error": null }`.
+- `GET /api/training/runs/{id}`: fetch run status.
+- `POST /api/training/runs/{id}/cancel`: cancel an in-flight run.
+- Errors: `training_not_found` (404) for unknown run ids, `invalid_payload` (400) for bad requests.
+
 ## Rate Limits & Backoff (planned)
 - No rate limits in MVP, but clients should support `429` with backoff.
 - Active game cap (`MAX_ACTIVE_GAMES`) may return `429`; clients should surface a friendly retry message.

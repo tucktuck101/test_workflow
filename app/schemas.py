@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from .engine import PlayerType
+from .trainer_orchestrator import RunStatus
 
 
 class GameConfig(BaseModel):
@@ -70,3 +71,18 @@ class ErrorResponse(BaseModel):
     error_code: str
     message: str
     details: Optional[dict] = None
+
+
+class TrainingRunConfig(BaseModel):
+    params: dict | None = None
+
+
+class TrainingRunResponse(BaseModel):
+    run_id: str
+    status: RunStatus
+    config: dict
+    error: Optional[str] = None
+
+
+class TrainingRunCreateRequest(BaseModel):
+    config: dict | None = None

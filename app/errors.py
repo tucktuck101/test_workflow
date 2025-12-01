@@ -4,6 +4,7 @@ ERROR_MAPPING = {
     "invalid_coordinates": (status.HTTP_400_BAD_REQUEST, "Invalid coordinates"),
     "duplicate_move": (status.HTTP_400_BAD_REQUEST, "Duplicate move"),
     "invalid_payload": (status.HTTP_400_BAD_REQUEST, "Invalid payload"),
+    "training_not_found": (status.HTTP_404_NOT_FOUND, "Training run not found"),
     "game_not_found": (status.HTTP_404_NOT_FOUND, "Game not found"),
     "game_finished": (status.HTTP_409_CONFLICT, "Game already finished"),
     "capacity_exceeded": (status.HTTP_429_TOO_MANY_REQUESTS, "Capacity exceeded"),

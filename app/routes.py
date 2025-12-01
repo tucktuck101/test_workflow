@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 from typing import Callable, List, Tuple
@@ -13,6 +14,7 @@ from .health import readiness_payload
 from .model_loader import ModelLoader
 from .obs import Observability
 from .rate_limit import RateLimitExceeded, SimpleRateLimiter
+from .trainer_orchestrator import DummyTrainerOrchestrator, TrainerOrchestrator
 from .schemas import (
     AgentMove,
     ErrorResponse,
@@ -24,7 +26,11 @@ from .schemas import (
     MoveResult,
     PlayerType,
     QuitResponse,
+    TrainingRunCreateRequest,
+    TrainingRunResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _blank_board(size: int) -> List[List[str]]:
@@ -106,13 +112,14 @@ def _auto_play(session: engine.GameSession, player_policy, agent_policy) -> engi
     return session
 
 
-def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Observability) -> APIRouter:
+def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Observability, trainer_orchestrator: TrainerOrchestrator | None = None) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["gameplay"])
     session_store = engine.InMemorySessionStore(settings.max_active_games, ttl_seconds=3600)
     policy_path = None
     if settings.model_path.exists() and settings.deterministic_mode is False:
         policy_path = settings.model_path
     agent_adapter = agent.AgentAdapter(deterministic=settings.deterministic_mode, policy_path=policy_path)
+    trainer_orch = trainer_orchestrator or DummyTrainerOrchestrator()
     rate_limiter = SimpleRateLimiter(capacity=5, refill_rate_per_sec=1.0, retry_after=5)
     rate_limit_hits = 0
 
@@ -272,6 +279,39 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
             engine.quit_game(session)
         session_store.end(game_id)
         return QuitResponse(status="ended")
+
+    @router.post(
+        "/training/runs",
+        response_model=TrainingRunResponse,
+        responses={503: {"model": ErrorResponse}},
+    )
+    def start_training(request: Request, payload: TrainingRunCreateRequest | None = Body(default=None)) -> TrainingRunResponse:
+        cfg = payload.config if payload else {}
+        run = trainer_orch.start_run(cfg or {})
+        logger.info("training run requested", extra={"run_id": run.run_id, "client": request.client.host if request.client else "unknown"})
+        return TrainingRunResponse(run_id=run.run_id, status=run.status, config=run.config, error=run.error)
+
+    @router.get(
+        "/training/runs/{run_id}",
+        response_model=TrainingRunResponse,
+        responses={404: {"model": ErrorResponse}},
+    )
+    def get_training(run_id: str) -> TrainingRunResponse:
+        run = trainer_orch.get_run(run_id)
+        if not run:
+            raise_http("training_not_found")
+        return TrainingRunResponse(run_id=run.run_id, status=run.status, config=run.config, error=run.error)
+
+    @router.post(
+        "/training/runs/{run_id}/cancel",
+        response_model=TrainingRunResponse,
+        responses={404: {"model": ErrorResponse}},
+    )
+    def cancel_training(run_id: str) -> TrainingRunResponse:
+        run = trainer_orch.cancel_run(run_id)
+        if not run:
+            raise_http("training_not_found")
+        return TrainingRunResponse(run_id=run.run_id, status=run.status, config=run.config, error=run.error)
 
     return router
 

@@ -39,3 +39,11 @@ docker run --rm -v $(pwd)/artifacts:/app/artifacts -v $(pwd)/configs:/app/config
 ## Config/Artifacts
 - Trainer reads configs via env vars; outputs artifacts/manifests to the mounted `TRAIN_OUTPUT`.
 - Backend only needs the artifact/manifest on disk; it continues to serve even when trainer is not running.
+
+## API-based orchestration (backend)
+- Endpoints:
+  - `POST /api/training/runs` to start a run (accepts optional `config` dict).
+  - `GET /api/training/runs/{id}` to check status.
+  - `POST /api/training/runs/{id}/cancel` to cancel.
+- Status values: `pending`, `running`, `succeeded`, `failed`, `canceled`.
+- Current orchestrator is a dummy/local simulator; Compose/K8s stubs are present to extend as needed.
