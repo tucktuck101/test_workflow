@@ -2,16 +2,17 @@ import csv
 import json
 import math
 import os
+import random
 import sys
 from collections import deque, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Deque, List, Optional, Tuple
 
 import numpy as np
 
-from training.curriculum import CurriculumConfig, load_curriculum
+from training.curriculum import CurriculumConfig, CurriculumState, load_curriculum
 from training.config import TrainConfig
 from training.config_loader import apply_overrides, dataclass_field_names, load_yaml_config, validate_values, validate_yaml_sections
 from training.env import DEFAULT_SHIPS
@@ -199,6 +200,8 @@ class DQNConfig:
 class SelfPlayConfig:
     chunk_episodes: int = 5000
     max_rounds: int = 20
+    max_episodes: Optional[int] = None
+    max_duration_sec: Optional[int] = None
     snapshot_interval: int = 500
     baseline_games: int = 0
     baseline_threshold: float = 0.0
@@ -221,6 +224,8 @@ class SelfPlayConfig:
         return cls(
             chunk_episodes=int(os.getenv("DQN_SELFPLAY_CHUNK", "5000")),
             max_rounds=int(os.getenv("DQN_SELFPLAY_MAX_ROUNDS", "20")),
+            max_episodes=int(os.getenv("DQN_SELFPLAY_MAX_EPISODES", "0")) or None,
+            max_duration_sec=int(os.getenv("DQN_SELFPLAY_MAX_DURATION", "0")) or None,
             snapshot_interval=int(os.getenv("DQN_SELFPLAY_SNAPSHOT", "500")),
             baseline_games=int(os.getenv("DQN_BASELINE_GAMES", "0")),
             baseline_threshold=float(os.getenv("DQN_BASELINE_THRESHOLD", "0.0")),
@@ -236,6 +241,41 @@ class SelfPlayConfig:
             progress_log=os.getenv("DQN_PROGRESS_LOG", "1").lower() in {"1", "true", "yes", "on"},
             progress_path=Path(os.getenv("DQN_PROGRESS_PATH")).expanduser().resolve() if os.getenv("DQN_PROGRESS_PATH") else None,
         )
+
+
+def _to_tuple_ships(ships: Optional[List[List[object]]]) -> Optional[List[Tuple[str, int]]]:
+    if ships is None:
+        return None
+    converted = []
+    for name, length in ships:
+        converted.append((str(name), int(length)))
+    return converted
+
+
+def apply_phase_overrides(train_cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfig, phase) -> tuple[TrainConfig, DQNConfig, SelfPlayConfig]:
+    train_overrides = phase.hyperparams.train.dict(exclude_none=True) if phase.hyperparams and phase.hyperparams.train else {}
+    dqn_overrides = phase.hyperparams.dqn.dict(exclude_none=True) if phase.hyperparams and phase.hyperparams.dqn else {}
+    sp_overrides = phase.hyperparams.selfplay.dict(exclude_none=True) if phase.hyperparams and phase.hyperparams.selfplay else {}
+    if "ships" in train_overrides:
+        train_overrides["ships"] = _to_tuple_ships(train_overrides["ships"])
+    return (
+        replace(train_cfg, **train_overrides),
+        replace(dqn_cfg, **dqn_overrides),
+        replace(sp_cfg, **sp_overrides),
+    )
+
+
+def select_opponent_from_mix(opponents, rng: random.Random) -> Optional[str]:
+    if not opponents:
+        return None
+    total = sum(o.weight for o in opponents)
+    pick = rng.random() * total
+    upto = 0.0
+    for entry in opponents:
+        upto += entry.weight
+        if pick <= upto:
+            return entry.opponent
+    return opponents[-1].opponent
 
 
 class ReplayBuffer:
@@ -894,37 +934,76 @@ def evaluate_policy(
 def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfig, opponent_type: Optional[str] = None, curriculum: Optional[CurriculumConfig] = None) -> dict:
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     debug = os.getenv("DQN_DEBUG", "0").lower() in {"1", "true", "yes", "on"}
-    env_params = {
-        "board_size": cfg.board_size,
-        "ships": cfg.ships or DEFAULT_SHIPS,
-        "allow_adjacent": cfg.allow_adjacent,
-        "reward_step_base": cfg.reward_step_base,
-        "reward_step_decay": cfg.reward_step_decay,
-        "reward_step_cap": cfg.reward_step_cap,
-        "reward_hit": cfg.reward_hit,
-        "reward_miss": cfg.reward_miss,
-        "reward_sink_mult": cfg.reward_sink_mult,
-        "reward_win_max": cfg.reward_win_max,
-        "reward_win_decay_k": cfg.reward_win_decay_k,
-        "reward_loss": cfg.reward_loss,
-        "reward_perfect_move": cfg.reward_perfect_move,
-    }
-    env = VectorEnv(seed=cfg.seed, **env_params)
-    channels = 6
-    input_dim = channels * cfg.board_size * cfg.board_size
-    output_dim = cfg.board_size * cfg.board_size
-    q_net = NumpyDQN(
-        input_dim,
-        output_dim,
-        hidden=dqn_cfg.hidden,
-        use_dueling=dqn_cfg.use_dueling,
-        model=dqn_cfg.model,
-        input_channels=channels,
-        board_size=cfg.board_size,
-        conv_channels=dqn_cfg.conv_channels,
+    curriculum = curriculum or load_curriculum()
+    base_train_cfg = replace(cfg)
+    base_dqn_cfg = replace(dqn_cfg)
+    base_sp_cfg = replace(sp_cfg)
+    rng = random.Random(cfg.seed)
+    cfg.output_dir.mkdir(parents=True, exist_ok=True)
+    state = CurriculumState(
+        curriculum,
+        cfg.output_dir,
+        run_id,
+        max_episodes=sp_cfg.max_episodes,
+        max_duration_sec=sp_cfg.max_duration_sec,
     )
-    target_net = q_net.copy()
-    buffer = ReplayBuffer(dqn_cfg.buffer_size)
+    channels = 6
+    env_params: dict = {}
+    env: Optional[VectorEnv] = None
+    q_net: Optional[NumpyDQN] = None
+    target_net: Optional[NumpyDQN] = None
+    buffer: Optional[ReplayBuffer] = None
+    epsilon = 0.0
+    eps_min = 0.0
+    eps_decay = 0.0
+
+    def configure_for_phase(phase) -> None:
+        nonlocal cfg, dqn_cfg, sp_cfg, env_params, env, q_net, target_net, buffer, epsilon, eps_min, eps_decay
+        cfg, dqn_cfg, sp_cfg = apply_phase_overrides(base_train_cfg, base_dqn_cfg, base_sp_cfg, phase)
+        env_params = {
+            "board_size": cfg.board_size,
+            "ships": cfg.ships or DEFAULT_SHIPS,
+            "allow_adjacent": cfg.allow_adjacent,
+            "reward_step_base": cfg.reward_step_base,
+            "reward_step_decay": cfg.reward_step_decay,
+            "reward_step_cap": cfg.reward_step_cap,
+            "reward_hit": cfg.reward_hit,
+            "reward_miss": cfg.reward_miss,
+            "reward_sink_mult": cfg.reward_sink_mult,
+            "reward_win_max": cfg.reward_win_max,
+            "reward_win_decay_k": cfg.reward_win_decay_k,
+            "reward_loss": cfg.reward_loss,
+            "reward_perfect_move": cfg.reward_perfect_move,
+        }
+        env = VectorEnv(seed=cfg.seed, **env_params)
+        input_dim = channels * cfg.board_size * cfg.board_size
+        output_dim = cfg.board_size * cfg.board_size
+        needs_new_net = (
+            q_net is None
+            or q_net.board_size != cfg.board_size
+            or q_net.model_type != dqn_cfg.model
+            or q_net.hidden != dqn_cfg.hidden
+            or q_net.conv_channels != dqn_cfg.conv_channels
+        )
+        if needs_new_net:
+            q_net_local = NumpyDQN(
+                input_dim,
+                output_dim,
+                hidden=dqn_cfg.hidden,
+                use_dueling=dqn_cfg.use_dueling,
+                model=dqn_cfg.model,
+                input_channels=channels,
+                board_size=cfg.board_size,
+                conv_channels=dqn_cfg.conv_channels,
+            )
+        else:
+            q_net_local = q_net
+        q_net = q_net_local
+        target_net = q_net.copy()
+        buffer = ReplayBuffer(dqn_cfg.buffer_size)
+        epsilon = dqn_cfg.epsilon_start
+        eps_min = dqn_cfg.epsilon_min
+        eps_decay = (dqn_cfg.epsilon_start - eps_min) / max(1, dqn_cfg.epsilon_decay)
     metrics_path = sp_cfg.metrics_path or (cfg.output_dir / f"dqn_selfplay_metrics-{run_id}.csv")
     progress_path = sp_cfg.progress_path or (cfg.output_dir / f"dqn_progress-{run_id}.jsonl")
     log_counter = 1
@@ -937,13 +1016,14 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
         if not sp_cfg.progress_log:
             return
         progress_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"timestamp": datetime.now(timezone.utc).isoformat(), **data}
+        payload = {"timestamp": datetime.now(timezone.utc).isoformat(), "curriculum_phase": state.current_phase.id, **data}
         with progress_path.open("a") as pf:
             pf.write(json.dumps(payload) + "\n")
 
     metric_fields = [
         "timestamp",
         "phase",
+        "curriculum_phase",
         "round",
         "episode",
         "opponent",
@@ -960,12 +1040,13 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
         "loss_reward",
     ]
 
+    configure_for_phase(state.current_phase)
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     with metrics_path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=metric_fields)
         writer.writeheader()
-        writer.writerow({"timestamp": datetime.now(timezone.utc).isoformat(), "phase": "run_start", "round": 0, "episode": 0, "opponent": None, "epsilon": dqn_cfg.epsilon_start, "outcome": None, "p1_moves": None, "p2_moves": None})
-    log_progress({"event": "run_start", "run_id": run_id, "epsilon": dqn_cfg.epsilon_start})
+        writer.writerow({"timestamp": datetime.now(timezone.utc).isoformat(), "phase": "run_start", "curriculum_phase": state.current_phase.id, "round": 0, "episode": 0, "opponent": None, "epsilon": dqn_cfg.epsilon_start, "outcome": None, "p1_moves": None, "p2_moves": None})
+    log_progress({"event": "run_start", "run_id": run_id, "epsilon": dqn_cfg.epsilon_start, "curriculum_phase": state.current_phase.id})
 
     def log_metrics(row: dict) -> None:
         if not metrics_path:
@@ -975,15 +1056,12 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
             writer = csv.DictWriter(f, fieldnames=metric_fields)
             if "timestamp" not in row:
                 row["timestamp"] = datetime.now(timezone.utc).isoformat()
+            row.setdefault("curriculum_phase", state.current_phase.id)
             # assign a monotonically increasing episode id for every log row to ensure uniqueness across phases
             nonlocal log_counter
             row["episode"] = log_counter
             log_counter += 1
             writer.writerow(row)
-
-    epsilon = dqn_cfg.epsilon_start
-    eps_min = dqn_cfg.epsilon_min
-    eps_decay = (dqn_cfg.epsilon_start - eps_min) / max(1, dqn_cfg.epsilon_decay)
 
     def decay_eps(eps: float) -> float:
         if eps > eps_min:
@@ -1104,33 +1182,57 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
         f"baseline_games={sp_cfg.baseline_games} eval_games={sp_cfg.eval_games} metrics={metrics_path}"
     )
 
+    log_progress({"event": "phase_start", "round": 0, "phase_id": state.current_phase.id})
     current_episode = 1
-    for round_idx in range(1, sp_cfg.max_rounds + 1):
+    round_idx = 1
+    while True:
+        if state.limits_reached():
+            state.persist()
+            summary = {
+                "run_id": run_id,
+                "status": "stopped_limit",
+                "curriculum_phase": state.current_phase.id,
+                "curriculum_state": str(state.state_path),
+            }
+            if curriculum:
+                summary["curriculum"] = {"version": curriculum.version, "phases": [p.id for p in curriculum.phases]}
+            summary_path = cfg.output_dir / f"dqn_selfplay_run-{run_id}.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text(json.dumps(summary, indent=2))
+            return summary
+
+        start_ep = current_episode
         current_episode = train_round(target_net, current_episode)
-        log_progress({"event": "train_round_complete", "round": round_idx, "epsilon": epsilon, "buffer": len(buffer)})
-        # baseline eval vs random
+        trained_eps = current_episode - start_ep
+        state.record_training(trained_eps)
+        state.persist()
+        log_progress({"event": "train_round_complete", "round": round_idx, "epsilon": epsilon, "buffer": len(buffer), "episodes": trained_eps})
+        # baseline eval vs opponent mix
+        phase_opponent = select_opponent_from_mix(state.current_phase.opponents, rng) or opponent_type
+        baseline_wr = None
         if sp_cfg.baseline_games > 0:
             baseline_wr, baseline_summaries = evaluate_policy(
                 q_net,
-                opponent_type if opponent_type else None,
+                phase_opponent if phase_opponent else None,
                 sp_cfg.baseline_games,
                 env_params,
                 cfg.seed + round_idx,
                 workers=sp_cfg.baseline_workers,
-                opponent_label="baseline",
+                opponent_label=phase_opponent or "baseline",
             )
             print(f"[dqn-selfplay] round {round_idx} baseline win_rate={baseline_wr:.3f}", file=sys.stderr, flush=True)
             dlog(f"baseline eval done round={round_idx} wr={baseline_wr:.3f}")
             for s in baseline_summaries:
                 log_metrics({"phase": "baseline_eval", "round": round_idx, "episode": current_episode, "opponent": s["opponent"], "epsilon": epsilon, "outcome": s["outcome"], "p1_moves": s.get("p1_moves"), "p2_moves": s.get("p2_moves")})
             if baseline_wr < sp_cfg.baseline_threshold:
-                if round_idx == sp_cfg.max_rounds:
+                if round_idx == sp_cfg.max_rounds and not state.should_advance():
                     raise RuntimeError(f"baseline win_rate {baseline_wr:.3f} below threshold {sp_cfg.baseline_threshold}")
+                round_idx += 1
                 continue
-            log_progress({"event": "baseline_eval", "round": round_idx, "win_rate": baseline_wr, "games": sp_cfg.baseline_games})
+            log_progress({"event": "baseline_eval", "round": round_idx, "win_rate": baseline_wr, "games": sp_cfg.baseline_games, "opponent": phase_opponent})
 
         snapshot = q_net.copy()
-        eval_opponent = opponent_type if opponent_type else snapshot
+        eval_opponent = phase_opponent if phase_opponent else snapshot
         wr, eval_summaries = evaluate_policy(
             q_net,
             eval_opponent,
@@ -1138,7 +1240,7 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
             env_params,
             cfg.seed + round_idx * 3,
             workers=sp_cfg.eval_workers,
-            opponent_label="selfplay_eval",
+            opponent_label=phase_opponent or "selfplay_eval",
         )
         print(f"[dqn-selfplay] round {round_idx} self win_rate={wr:.3f}", file=sys.stderr, flush=True)
         dlog(f"selfplay eval done round={round_idx} wr={wr:.3f}")
@@ -1146,7 +1248,9 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
             log_metrics({"phase": "selfplay_eval", "round": round_idx, "episode": current_episode, "opponent": s["opponent"], "epsilon": epsilon, "outcome": s["outcome"], "p1_moves": s.get("p1_moves"), "p2_moves": s.get("p2_moves")})
         move_values = [s.get("p1_moves") for s in eval_summaries if s.get("p1_moves") is not None]
         avg_moves = sum(move_values) / len(move_values) if move_values else None
-        log_progress({"event": "selfplay_eval", "round": round_idx, "win_rate": wr, "games": sp_cfg.eval_games, "avg_moves": avg_moves})
+        state.record_round(wr, avg_moves, baseline_wr)
+        state.persist()
+        log_progress({"event": "selfplay_eval", "round": round_idx, "win_rate": wr, "games": sp_cfg.eval_games, "avg_moves": avg_moves, "opponent": phase_opponent})
         if wr >= sp_cfg.eval_threshold and (sp_cfg.move_gate is None or (avg_moves is not None and avg_moves <= sp_cfg.move_gate)):
             artifact_name = cfg.artifact_name if cfg.artifact_name.endswith(".npz") else f"{cfg.artifact_name}.npz"
             artifact_path = cfg.output_dir / artifact_name
@@ -1185,6 +1289,8 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 "baseline_games": sp_cfg.baseline_games,
                 "baseline_threshold": sp_cfg.baseline_threshold,
                 "run_id": run_id,
+                "curriculum_phase": state.current_phase.id,
+                "curriculum_state": str(state.state_path),
             }
             if curriculum:
                 manifest["curriculum"] = {
@@ -1202,6 +1308,8 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 "avg_moves": avg_moves,
                 "baseline_games": sp_cfg.baseline_games,
                 "baseline_threshold": sp_cfg.baseline_threshold,
+                "curriculum_state": str(state.state_path),
+                "curriculum_phase": state.current_phase.id,
             }
             if curriculum:
                 summary["curriculum"] = {"version": curriculum.version, "phases": [p.id for p in curriculum.phases]}
@@ -1211,7 +1319,21 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
         else:
             if wr >= sp_cfg.eval_threshold and sp_cfg.move_gate is not None and (avg_moves is None or avg_moves > sp_cfg.move_gate):
                 print(f"[dqn-selfplay] round {round_idx} win_rate ok but avg_moves={avg_moves} above gate {sp_cfg.move_gate}", file=sys.stderr, flush=True)
-    raise RuntimeError(f"self-play win_rate did not reach threshold {sp_cfg.eval_threshold}")
+
+        if state.should_advance():
+            prev_phase = state.current_phase.id
+            advanced = state.advance()
+            state.persist()
+            log_progress({"event": "curriculum_advance", "from": prev_phase, "to": state.current_phase.id if advanced else prev_phase})
+            if advanced:
+                configure_for_phase(state.current_phase)
+                log_progress({"event": "phase_start", "round": round_idx, "phase_id": state.current_phase.id})
+                round_idx = 1
+                continue
+
+        round_idx += 1
+        if round_idx > sp_cfg.max_rounds:
+            raise RuntimeError(f"self-play win_rate did not reach threshold {sp_cfg.eval_threshold}")
 
 
 def main() -> None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -161,3 +163,109 @@ def load_curriculum(path: str | Path | None = None, data: dict | None = None) ->
         return CurriculumConfig(**data)
     except ValidationError as exc:
         raise ValueError(f"Invalid curriculum configuration: {exc}") from exc
+
+
+@dataclass
+class PhaseProgress:
+    phase_id: str
+    phase_index: int
+    episodes: int = 0
+    rounds: int = 0
+    last_win_rate: float | None = None
+    last_avg_moves: float | None = None
+    last_baseline_win_rate: float | None = None
+
+
+class CurriculumState:
+    """Tracks curriculum progress, gating, and persistence."""
+
+    def __init__(
+        self,
+        curriculum: CurriculumConfig,
+        output_dir: Path,
+        run_id: str,
+        max_episodes: int | None = None,
+        max_duration_sec: int | None = None,
+    ) -> None:
+        self.curriculum = curriculum
+        self.output_dir = output_dir
+        self.run_id = run_id
+        self.phase_index = 0
+        self.progress = PhaseProgress(self.current_phase.id, self.phase_index)
+        self.total_episodes = 0
+        self.total_rounds = 0
+        self.started_at = datetime.now(timezone.utc)
+        self.state_path = output_dir / "curriculum_state.json"
+        self.max_episodes = max_episodes
+        self.max_duration_sec = max_duration_sec
+        self.persist()
+
+    @property
+    def current_phase(self) -> CurriculumPhase:
+        return self.curriculum.phases[self.phase_index]
+
+    def record_training(self, episodes: int) -> None:
+        self.progress.episodes += episodes
+        self.total_episodes += episodes
+
+    def record_round(self, win_rate: float, avg_moves: Optional[float], baseline_wr: Optional[float]) -> None:
+        self.progress.rounds += 1
+        self.total_rounds += 1
+        self.progress.last_win_rate = win_rate
+        self.progress.last_avg_moves = avg_moves
+        self.progress.last_baseline_win_rate = baseline_wr
+
+    def should_advance(self) -> bool:
+        gating = self.current_phase.gating
+        if gating.min_episodes and self.progress.episodes < gating.min_episodes:
+            return False
+        if gating.min_rounds and self.progress.rounds < gating.min_rounds:
+            return False
+        if gating.min_win_rate is not None:
+            if self.progress.last_win_rate is None or self.progress.last_win_rate < gating.min_win_rate:
+                return False
+        if gating.min_avg_moves is not None:
+            if self.progress.last_avg_moves is None or self.progress.last_avg_moves > gating.min_avg_moves:
+                return False
+        if gating.min_baseline_win_rate is not None:
+            if self.progress.last_baseline_win_rate is None or self.progress.last_baseline_win_rate < gating.min_baseline_win_rate:
+                return False
+        return True
+
+    def advance(self) -> bool:
+        if self.phase_index >= len(self.curriculum.phases) - 1:
+            return False
+        self.phase_index += 1
+        self.progress = PhaseProgress(self.current_phase.id, self.phase_index)
+        return True
+
+    @property
+    def completed(self) -> bool:
+        if self.phase_index < len(self.curriculum.phases) - 1:
+            return False
+        return self.should_advance()
+
+    def limits_reached(self) -> bool:
+        if self.max_episodes is not None and self.total_episodes >= self.max_episodes:
+            return True
+        if self.max_duration_sec is not None:
+            elapsed = (datetime.now(timezone.utc) - self.started_at).total_seconds()
+            if elapsed >= self.max_duration_sec:
+                return True
+        return False
+
+    def persist(self) -> None:
+        payload = {
+            "run_id": self.run_id,
+            "started_at": self.started_at.isoformat(),
+            "phase_index": self.phase_index,
+            "current_phase": self.current_phase.id,
+            "progress": asdict(self.progress),
+            "total_episodes": self.total_episodes,
+            "total_rounds": self.total_rounds,
+            "max_episodes": self.max_episodes,
+            "max_duration_sec": self.max_duration_sec,
+            "completed": self.completed,
+        }
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        self.state_path.write_text(yaml.safe_dump(payload))
