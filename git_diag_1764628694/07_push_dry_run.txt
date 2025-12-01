@@ -1,0 +1,7 @@
+## Current branch
+task-028-frontend-ux
+
+## Test: git push --dry-run origin task-028-frontend-ux
+To https://github.com/tucktuck101/test_workflow.git
+ * [new branch]      task-028-frontend-ux -> task-028-frontend-ux
+exit_code=0

@@ -1,0 +1,3 @@
+## Test: ls-remote origin (read-only)
+698cd450b525aef0a6bef1ce56281995c32ccc17	HEAD
+exit_code=0

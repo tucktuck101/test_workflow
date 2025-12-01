@@ -1,0 +1,16 @@
+## Environment proxy vars
+(no proxy-related env vars)
+
+## Global Git proxy config
+(no http.proxy configured)
+(no https.proxy configured)
+
+## Global Git HTTP tuning (if any)
+(no http.version configured)
+(no GitHub-specific http.version configured)
+(no http.postBuffer configured)
+
+## Credential helpers
+file:/Library/Developer/CommandLineTools/usr/share/git-core/gitconfig	osxkeychain
+file:/Users/jeff/.gitconfig	
+file:/Users/jeff/.gitconfig	/usr/local/share/gcm-core/git-credential-manager-core

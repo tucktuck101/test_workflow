@@ -1,0 +1,245 @@
+
+
+set -u
+
+REPORT_DIR="/tmp/git_diag_$(date +%s)"
+mkdir -p "$REPORT_DIR"
+
+section() {
+  echo
+  echo "======================"
+  echo "$1"
+  echo "======================"
+}
+
+echo "Git/GitHub diagnostic report"
+echo "Report directory: $REPORT_DIR"
+
+################################################################################
+# SECTION 1: SYSTEM & GIT BINARY
+################################################################################
+section "1. SYSTEM & GIT BINARY"
+
+{
+  date
+  echo
+  echo "## macOS / kernel"
+  if command -v sw_vers >/dev/null 2>&1; then
+    sw_vers
+  else
+    uname -a
+  fi
+
+  echo
+  echo "## Git binary & version"
+  which git || echo "which git: NOT FOUND"
+  git --version 2>&1
+
+} | tee "$REPORT_DIR/01_system_git.txt"
+
+################################################################################
+# SECTION 2: PROXY & GLOBAL GIT CONFIG
+################################################################################
+section "2. PROXY & GLOBAL GIT CONFIG"
+
+{
+  echo "## Environment proxy vars"
+  env | grep -i proxy || echo "(no proxy-related env vars)"
+
+  echo
+  echo "## Global Git proxy config"
+  git config --show-origin --get-all http.proxy 2>/dev/null || echo "(no http.proxy configured)"
+  git config --show-origin --get-all https.proxy 2>/dev/null || echo "(no https.proxy configured)"
+
+  echo
+  echo "## Global Git HTTP tuning (if any)"
+  git config --show-origin --get-all http.version 2>/dev/null || echo "(no http.version configured)"
+  git config --show-origin --get-all "http.https://github.com/.version" 2>/dev/null || echo "(no GitHub-specific http.version configured)"
+  git config --show-origin --get-all http.postBuffer 2>/dev/null || echo "(no http.postBuffer configured)"
+
+  echo
+  echo "## Credential helpers"
+  git config --show-origin --get-all credential.helper 2>/dev/null || echo "(no credential.helper configured)"
+
+} | tee "$REPORT_DIR/02_proxy_and_http.txt"
+
+################################################################################
+# SECTION 3: REPO CONTEXT (LOCAL)
+################################################################################
+section "3. REPO CONTEXT (LOCAL)"
+
+{
+  echo "## Working directory"
+  pwd
+  echo
+
+  echo "## Is this a Git worktree?"
+  git rev-parse --is-inside-work-tree 2>&1 || echo "(not inside a worktree?)"
+  echo
+
+  echo "## Top-level directory"
+  git rev-parse --show-toplevel 2>/dev/null || echo "(cannot determine toplevel)"
+  echo
+
+  echo "## Local status (short)"
+  git status -sb 2>&1
+  echo
+
+  echo "## Local branches (verbose)"
+  git branch -vv 2>&1
+
+} | tee "$REPORT_DIR/03_repo_local_state.txt"
+
+################################################################################
+# SECTION 4: REMOTE CONFIG & REMOTE HEADS
+################################################################################
+section "4. REMOTE CONFIG & REMOTE HEADS"
+
+REMOTE_ORIGIN_URL="$(git remote get-url origin 2>/dev/null || echo "")"
+
+{
+  echo "## Remotes"
+  git remote -v 2>&1
+  echo
+
+  echo "## 'origin' details"
+  git remote show origin 2>&1 || echo "(no origin remote?)"
+  echo
+
+  echo "## Remote heads from origin"
+  if [ -n "$REMOTE_ORIGIN_URL" ]; then
+    git ls-remote --heads origin 2>&1
+  else
+    echo "(no origin URL, skipping ls-remote)"
+  fi
+} | tee "$REPORT_DIR/04_remote_state.txt"
+
+################################################################################
+# SECTION 5: GLOBAL GITHUB CONNECTIVITY (PUBLIC REPO)
+################################################################################
+section "5. GLOBAL GITHUB CONNECTIVITY (PUBLIC REPO)"
+
+GLOBAL_LSREMOTE_OK=0
+
+{
+  echo "## Test: ls-remote against public repo 'git/git' over HTTPS"
+  git ls-remote https://github.com/git/git.git HEAD 2>&1
+  GLOBAL_LSREMOTE_EXIT=$?
+  echo "exit_code=$GLOBAL_LSREMOTE_EXIT"
+} | tee "$REPORT_DIR/05_global_lsremote.txt"
+
+if [ "${GLOBAL_LSREMOTE_EXIT:-1}" -eq 0 ]; then
+  GLOBAL_LSREMOTE_OK=1
+fi
+
+################################################################################
+# SECTION 6: ORIGIN CONNECTIVITY (THIS REPO, READ-ONLY)
+################################################################################
+section "6. ORIGIN CONNECTIVITY (THIS REPO)"
+
+ORIGIN_LSREMOTE_OK=0
+
+{
+  echo "## Test: ls-remote origin (read-only)"
+  if [ -n "$REMOTE_ORIGIN_URL" ]; then
+    git ls-remote origin HEAD 2>&1
+    ORIGIN_LSREMOTE_EXIT=$?
+    echo "exit_code=$ORIGIN_LSREMOTE_EXIT"
+  else
+    echo "(no origin URL configured)"
+    ORIGIN_LSREMOTE_EXIT=1
+    echo "exit_code=$ORIGIN_LSREMOTE_EXIT"
+  fi
+} | tee "$REPORT_DIR/06_origin_lsremote.txt"
+
+if [ "${ORIGIN_LSREMOTE_EXIT:-1}" -eq 0 ]; then
+  ORIGIN_LSREMOTE_OK=1
+fi
+
+################################################################################
+# SECTION 7: PUSH SIMULATION (DRY-RUN)
+################################################################################
+section "7. PUSH SIMULATION (DRY-RUN — SAFE)"
+
+PUSH_DRYRUN_OK=0
+CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
+
+{
+  echo "## Current branch"
+  echo "$CURRENT_BRANCH"
+  echo
+
+  if [ -z "$CURRENT_BRANCH" ] || [ "$CURRENT_BRANCH" = "HEAD" ]; then
+    echo "No named branch checked out (detached HEAD) — skipping push dry-run."
+    PUSH_DRYRUN_EXIT=1
+    echo "exit_code=$PUSH_DRYRUN_EXIT"
+  elif [ -z "$REMOTE_ORIGIN_URL" ]; then
+    echo "No origin remote — skipping push dry-run."
+    PUSH_DRYRUN_EXIT=1
+    echo "exit_code=$PUSH_DRYRUN_EXIT"
+  else
+    echo "## Test: git push --dry-run origin $CURRENT_BRANCH"
+    git push --dry-run origin "$CURRENT_BRANCH" 2>&1
+    PUSH_DRYRUN_EXIT=$?
+    echo "exit_code=$PUSH_DRYRUN_EXIT"
+  fi
+} | tee "$REPORT_DIR/07_push_dry_run.txt"
+
+if [ "${PUSH_DRYRUN_EXIT:-1}" -eq 0 ]; then
+  PUSH_DRYRUN_OK=1
+fi
+
+################################################################################
+# SECTION 8: CLASSIFICATION / DIAGNOSIS SUMMARY
+################################################################################
+section "8. CLASSIFICATION SUMMARY"
+
+CLASSIFICATION="UNKNOWN"
+DETAILS=()
+
+# Global connectivity check
+if [ "$GLOBAL_LSREMOTE_OK" -eq 0 ]; then
+  CLASSIFICATION="GLOBAL_GITHUB_CONNECTIVITY_OR_AUTH_PROBLEM"
+  DETAILS+=("ls-remote https://github.com/git/git.git HEAD failed → suggests global GitHub access/auth/SSL/problem.")
+else
+  # Global ok; check origin
+  if [ "$ORIGIN_LSREMOTE_OK" -eq 0 ]; then
+    CLASSIFICATION="ORIGIN_REMOTE_OR_NETWORK_PATH_PROBLEM"
+    DETAILS+=("Global GitHub ls-remote succeeded, but ls-remote origin HEAD failed → origin-specific or path/network issue.")
+  else
+    # Both ls-remote tests OK → base connectivity fine
+    if [ "$PUSH_DRYRUN_OK" -eq 0 ]; then
+      CLASSIFICATION="PUSH_REAL_PACK_OR_ENVIRONMENT-SPECIFIC_ISSUE"
+      DETAILS+=("Global & origin ls-remote OK and push --dry-run OK → basic connectivity fine.")
+      DETAILS+=("Real push failures likely due to large pack + HTTP/2/Apple Git bug, or network middlebox interfering.")
+    else
+      CLASSIFICATION="REPO_PUSH_CONFIG_OR_PERMISSIONS_ISSUE"
+      DETAILS+=("ls-remote global & origin OK, but push --dry-run failed.")
+      DETAILS+=("Suggests branch tracking / permissions / remote config problem rather than pure network.")
+    fi
+  fi
+fi
+
+echo "CLASSIFICATION: $CLASSIFICATION"
+echo
+
+echo "DETAILS:"
+if [ "${#DETAILS[@]}" -eq 0 ]; then
+  echo "  (no additional details)"
+else
+  for d in "${DETAILS[@]}"; do
+    echo "  - $d"
+  done
+fi
+
+echo
+echo "All raw logs are under: $REPORT_DIR"
+echo "Please copy-paste:"
+echo "  - This classification section"
+echo "  - 05_global_lsremote.txt"
+echo "  - 06_origin_lsremote.txt"
+echo "  - 07_push_dry_run.txt"
+echo "if you want deeper analysis."
+
+echo
+echo "Done."
