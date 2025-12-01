@@ -1,0 +1,53 @@
+train:
+  output_dir: ./artifacts
+  artifact_name: dqn_agent.npz
+  seed: 0
+  board_size: 10
+  version: dqn-curriculum
+  allow_adjacent: true
+  reward_step_base: -0.05
+  reward_step_decay: 0.0
+  reward_step_cap: -0.5
+  reward_hit: 1.0
+  reward_miss: 0.0
+  reward_sink_mult: 1.0
+  reward_win_max: 5.0
+  reward_win_decay_k: 82.0
+  reward_loss: -10.0
+  reward_perfect_move: 17
+
+dqn:
+  model: cnn
+  conv_channels: [16, 32]
+  dueling: true
+  double_dqn: true
+  use_huber: true
+  huber_delta: 1.0
+  clip_norm: 1.0
+  lr: 0.0003
+  target_update: 200
+  epsilon_start: 1.0
+  epsilon_min: 0.05
+  epsilon_decay: 8000
+  buffer_size: 20000
+  batch_size: 64
+  warmup_steps: 1000
+  hidden: 256
+
+selfplay:
+  chunk_episodes: 500
+  max_rounds: 200000
+  snapshot_interval: 5000
+  baseline_games: 100
+  baseline_threshold: 0.99
+  baseline_workers: 4
+  eval_games: 200
+  eval_threshold: 0.8
+  eval_workers: 4
+  loss_penalty: 5.0
+  rollout_workers: 4
+  batch_size: 1
+  move_gate: null
+
+# Optional scripted opponent for eval/baseline; omit or set to null to use self-play snapshot
+# opponent: probability

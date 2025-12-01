@@ -74,7 +74,12 @@ SHIP_SET = [
 ]
 
 
-def _place_ships(board_size: int, rng: random.Random) -> List[Ship]:
+def _neighbors(coord: Coordinate) -> List[Coordinate]:
+    x, y = coord
+    return [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if not (dx == 0 and dy == 0)]
+
+
+def _place_ships(board_size: int, rng: random.Random, *, allow_adjacent: bool = True) -> List[Ship]:
     occupied = set()
     ships: List[Ship] = []
 
@@ -92,6 +97,8 @@ def _place_ships(board_size: int, rng: random.Random) -> List[Ship]:
                 coords = [(x + i, y) for i in range(size)]
             if any(c in occupied for c in coords):
                 continue
+            if not allow_adjacent and any(n in occupied for coord in coords for n in _neighbors(coord)):
+                continue
             occupied.update(coords)
             ships.append(Ship(name=name, size=size, coordinates=coords))
             placed = True
@@ -104,6 +111,48 @@ def _check_bounds(board_size: int, coord: Coordinate) -> None:
         raise InvalidMove("invalid_coordinates")
 
 
+def _check_linearity(size: int, coords: List[Coordinate]) -> None:
+    xs = [c[0] for c in coords]
+    ys = [c[1] for c in coords]
+    same_x = len(set(xs)) == 1
+    same_y = len(set(ys)) == 1
+    if not (same_x or same_y):
+        raise InvalidMove("invalid_coordinates")
+    if same_x:
+        ordered = sorted(ys)
+        if ordered != list(range(min(ys), min(ys) + size)):
+            raise InvalidMove("invalid_coordinates")
+    else:
+        ordered = sorted(xs)
+        if ordered != list(range(min(xs), min(xs) + size)):
+            raise InvalidMove("invalid_coordinates")
+
+
+def validate_placements(board_size: int, placements: List[Ship], *, allow_adjacent: bool = True) -> None:
+    occupied = set()
+    expected = {name: size for name, size in SHIP_SET}
+    if len(placements) != len(expected):
+        raise InvalidMove("invalid_coordinates")
+    seen = set()
+    for ship in placements:
+        if ship.name not in expected or ship.name in seen:
+            raise InvalidMove("invalid_coordinates")
+        seen.add(ship.name)
+        expected_size = expected[ship.name]
+        if len(ship.coordinates) != expected_size:
+            raise InvalidMove("invalid_coordinates")
+        _check_linearity(expected_size, ship.coordinates)
+        for coord in ship.coordinates:
+            _check_bounds(board_size, coord)
+            if coord in occupied:
+                raise InvalidMove("duplicate_move")
+            if not allow_adjacent and any(n in occupied for n in _neighbors(coord)):
+                raise InvalidMove("duplicate_move")
+            occupied.add(coord)
+    if seen != set(expected.keys()):
+        raise InvalidMove("invalid_coordinates")
+
+
 def create_session(board_size: int, deterministic_seed: Optional[int] = None) -> GameSession:
     rng = random.Random(deterministic_seed)
     player_ships = _place_ships(board_size, rng)
@@ -112,6 +161,18 @@ def create_session(board_size: int, deterministic_seed: Optional[int] = None) ->
         game_id=str(uuid.uuid4()),
         board_size=board_size,
         player_ships=player_ships,
+        agent_ships=agent_ships,
+        deterministic_seed=deterministic_seed,
+    )
+
+
+def create_session_with_player(board_size: int, placements: List[Ship], deterministic_seed: Optional[int] = None) -> GameSession:
+    rng = random.Random(deterministic_seed)
+    agent_ships = _place_ships(board_size, rng)
+    return GameSession(
+        game_id=str(uuid.uuid4()),
+        board_size=board_size,
+        player_ships=placements,
         agent_ships=agent_ships,
         deterministic_seed=deterministic_seed,
     )
@@ -188,6 +249,12 @@ class InMemorySessionStore:
         self._sessions[session.game_id] = session
         self._created_at[session.game_id] = time.time()
         return session
+
+    def add(self, session: GameSession) -> None:
+        if self._max is not None and len(self._sessions) >= self._max:
+            raise InvalidMove("capacity_exceeded")
+        self._sessions[session.game_id] = session
+        self._created_at[session.game_id] = time.time()
 
     def get(self, game_id: str) -> Optional[GameSession]:
         session = self._sessions.get(game_id)

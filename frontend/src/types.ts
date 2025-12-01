@@ -1,6 +1,6 @@
 export type GameStatus = 'in_progress' | 'player_won' | 'agent_won' | 'quit' | 'aborted';
 
-export type CellState = 'unknown' | 'miss' | 'hit' | 'sunk';
+export type CellState = 'unknown' | 'miss' | 'hit' | 'sunk' | 'ship';
 
 export interface GameStartResponse {
   game_id: string;

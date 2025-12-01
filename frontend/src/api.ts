@@ -33,8 +33,12 @@ export async function fetchReadiness(): Promise<ReadyResponse> {
   return handle<ReadyResponse>(res);
 }
 
-export async function startGame(): Promise<GameStartResponse> {
-  const res = await fetch(buildUrl('/api/games'), { method: 'POST' });
+export async function startGame(placements?: { placements: { name: string; coordinates: number[][] }[] }): Promise<GameStartResponse> {
+  const res = await fetch(buildUrl('/api/games'), {
+    method: 'POST',
+    headers: placements ? { 'Content-Type': 'application/json' } : undefined,
+    body: placements ? JSON.stringify(placements) : undefined,
+  });
   return handle<GameStartResponse>(res);
 }
 

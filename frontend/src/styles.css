@@ -159,6 +159,8 @@ a {
 .cell.miss { background: rgba(255, 255, 255, 0.04); color: var(--muted); }
 .cell.hit { background: rgba(77, 225, 193, 0.15); color: var(--accent); border-color: rgba(77, 225, 193, 0.5); }
 .cell.sunk { background: rgba(255, 107, 107, 0.18); color: var(--danger); border-color: rgba(255, 107, 107, 0.6); }
+.cell.ship { background: rgba(77, 225, 193, 0.1); border-color: rgba(77, 225, 193, 0.35); color: var(--accent); }
+.cell.placement { border-color: var(--accent); background: rgba(77, 225, 193, 0.12); color: var(--accent); }
 
 .log {
   margin-top: 12px;

@@ -37,6 +37,10 @@ class Observability:
             name="rate_limit_hits_total",
             description="Rate limit rejections",
         )
+        self.session_evictions = self.meter.create_counter(
+            name="session_evictions_total",
+            description="Sessions evicted due to TTL or capacity",
+        )
 
     @contextmanager
     def span(self, name: str, attributes: Optional[Dict] = None) -> Iterator[None]:

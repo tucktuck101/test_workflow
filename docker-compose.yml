@@ -3,15 +3,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+    volumes:
+      - ./artifacts:/app/artifacts:ro
     environment:
-      - MODEL_PATH=/app/models/stub_model.bin
-      - MODEL_VERSION=stub-v1
-      - MODEL_HASH=9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e
+      - MODEL_PATH=/app/artifacts/model.bin
+      - MODEL_VERSION=trained-v1
+      - MODEL_HASH=53a9ed9fd60ea58fb6bbe76fc0a2751534046270b127697a114e6543363bbc2d
       - MODEL_DEVICE=cpu
       - BOARD_SIZE=10
       - LOG_LEVEL=debug
       - OBSERVABILITY_ENABLED=true
-      - DETERMINISTIC_MODE=true
+      - DETERMINISTIC_MODE=false
       - FRONTEND_ORIGIN=http://localhost:3000
     ports:
       - "8000:8000"

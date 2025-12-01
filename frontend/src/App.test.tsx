@@ -4,10 +4,21 @@ import App from './App';
 
 type FetchHandler = (url: string, init?: RequestInit) => Response;
 
+const BOARD_SIZE = 10;
+
+const makeBoard = (fill: string) => Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => fill));
+
 const startPayload = {
   game_id: 'g-1',
-  board: Array.from({ length: 2 }, () => ['unknown', 'unknown']),
-  agent_board_masked: Array.from({ length: 2 }, () => ['unknown', 'unknown']),
+  board: (() => {
+    const board = makeBoard('unknown');
+    // mark a few ships so we can assert visibility
+    board[0][0] = 'ship';
+    board[0][1] = 'ship';
+    board[1][0] = 'ship';
+    return board;
+  })(),
+  agent_board_masked: makeBoard('unknown'),
   status: 'in_progress',
   model_version: 'stub',
   model_hash: 'hash',
@@ -16,8 +27,8 @@ const startPayload = {
 const movePayload = {
   player_result: { outcome: 'hit' },
   agent_move: { x: 0, y: 1, outcome: 'miss' },
-  board: [['hit', 'unknown'], ['unknown', 'unknown']],
-  agent_board_masked: [['unknown', 'unknown'], ['unknown', 'unknown']],
+  board: makeBoard('unknown'),
+  agent_board_masked: makeBoard('unknown'),
   status: 'in_progress',
 };
 
@@ -29,6 +40,20 @@ function jsonResponse(payload: any, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function placeFleet() {
+  const anchors: [number, number][] = [
+    [0, 0], // Carrier (5) horizontal
+    [0, 1], // Battleship (4)
+    [0, 2], // Cruiser (3)
+    [0, 3], // Submarine (3)
+    [0, 4], // Destroyer (2)
+  ];
+  anchors.forEach(([x, y]) => {
+    const cell = screen.getByLabelText(new RegExp(`Your Board \\(place your ships\\) cell ${x},${y} \\(unknown\\)`, 'i'));
+    fireEvent.click(cell);
   });
 }
 
@@ -59,9 +84,15 @@ describe('App', () => {
     vi.stubGlobal('fetch', fetchMock as any);
 
     render(<App />);
-    const startBtn = await screen.findByRole('button', { name: /start/i });
+    const startBtn = await screen.findByRole('button', { name: /^Start Game$/i });
     fireEvent.click(startBtn);
-    await screen.findByText(/Game started/);
+
+    placeFleet();
+
+    const confirmBtn = screen.getByRole('button', { name: /confirm placements/i });
+    fireEvent.click(confirmBtn);
+    await screen.findByText(/Fleet deployed/);
+    expect(screen.getByLabelText(/Your Board .*0,0 \(ship\)/i)).toBeInTheDocument();
 
     const cells = screen.getAllByRole('button', { name: /Agent Board.*cell/ });
     fireEvent.click(cells[0]);
@@ -79,8 +110,12 @@ describe('App', () => {
     vi.stubGlobal('fetch', fetchMock as any);
 
     render(<App />);
-    const startBtn = await screen.findByRole('button', { name: /start/i });
+    const startBtn = await screen.findByRole('button', { name: /^Start Game$/i });
     fireEvent.click(startBtn);
+    placeFleet();
+
+    const confirmBtn = screen.getByRole('button', { name: /confirm placements/i });
+    fireEvent.click(confirmBtn);
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(/retry/);

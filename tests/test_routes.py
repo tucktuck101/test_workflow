@@ -18,7 +18,7 @@ def _make_app(monkeypatch, tmp_path: Path, **env_overrides):
     monkeypatch.setenv("MODEL_VERSION", "v0.0.1")
     monkeypatch.setenv("MODEL_HASH", model_hash)
     monkeypatch.setenv("MODEL_DEVICE", "cpu")
-    monkeypatch.setenv("BOARD_SIZE", str(env_overrides.get("BOARD_SIZE", 5)))
+    monkeypatch.setenv("BOARD_SIZE", str(env_overrides.get("BOARD_SIZE", 10)))
     monkeypatch.setenv("DETERMINISTIC_MODE", str(env_overrides.get("DETERMINISTIC_MODE", "true")))
     monkeypatch.setenv("MAX_ACTIVE_GAMES", str(env_overrides.get("MAX_ACTIVE_GAMES", 2)))
     monkeypatch.setenv("MODEL_ROOT", str(model_path.parent))
@@ -41,6 +41,22 @@ def test_start_and_move_flow(monkeypatch, tmp_path):
     assert "player_result" in data
     assert data["status"] in {"in_progress", "player_won", "agent_won"}
 
+
+def test_start_with_placements(monkeypatch, tmp_path):
+    client = _make_app(monkeypatch, tmp_path)
+    placements = {
+        "placements": [
+            {"name": "Carrier", "coordinates": [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]},
+            {"name": "Battleship", "coordinates": [[0, 1], [1, 1], [2, 1], [3, 1]]},
+            {"name": "Cruiser", "coordinates": [[0, 2], [1, 2], [2, 2]]},
+            {"name": "Submarine", "coordinates": [[0, 3], [1, 3], [2, 3]]},
+            {"name": "Destroyer", "coordinates": [[0, 4], [1, 4]]},
+        ]
+    }
+    resp = client.post("/api/games", json=placements)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "in_progress"
 
 def test_duplicate_move_returns_400(monkeypatch, tmp_path):
     client = _make_app(monkeypatch, tmp_path)

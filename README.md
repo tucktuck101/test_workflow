@@ -30,10 +30,19 @@ Production-ready Battleship web app where users anonymously play against a pre-t
 4) Backend formatting/linting: see `.editorconfig`, `.prettierrc.json`, and `pyproject.toml` for formatter/linter settings (black/ruff/prettier).
 5) Frontend: `cd frontend && npm install && npm run dev` (or `npm test` for vitest/RTL). Configure `VITE_API_BASE_URL` in `.env` if hitting a non-default backend.
 6) Makefile helpers: `make backend-coverage` (pytest with 90% gate), `make frontend-test` (vitest with thresholds), `make load-test` (k6 stub), `make setup` to bootstrap venv + npm deps. Devcontainer available in `.devcontainer/`.
-7) Containers: `docker compose up --build` builds backend/frontend with stub model; health checks wired to `/health/ready`. Frontend served on :3000 pointing to backend service.
-8) Training stub: `python -m training.trainer` (config via TRAIN_* envs) writes artifact + manifest to `./artifacts` by default; see tests/test_training.py for deterministic expectations.
+7) Containers: `make run` (or `docker compose up --build`) builds backend/frontend with the trained model mounted from `./artifacts` (see MODEL_* envs in docker-compose). Frontend served on :3000 pointing to backend service. Ensure `artifacts/model.bin` exists (run `make train` if not).
+8) Training stub: `python -m training.trainer` (config via TRAIN_* envs) writes artifact + manifest to `./artifacts` by default; logs progress every `TRAIN_LOG_INTERVAL` episodes (default 10). Defaults now mirror real rules: 10×10 board, full fleet (5/4/3/3/2), adjacency allowed by default (`TRAIN_ALLOW_ADJACENT=true`). If you shrink the board via `TRAIN_BOARD_SIZE`, supply a smaller fleet (via `TrainConfig` in code) or it will error when ships don't fit. See tests/test_training.py for deterministic expectations.
 9) Artifact validation: `python -m tools.validate_artifact --artifact <file> --manifest <manifest.json> --root <MODEL_ROOT> --device <cpu|cuda>` for promotion checks. Promotion/rollback steps in `docs/RUNBOOKS.md`.
 10) CI helper: manual workflow `.github/workflows/artifact-validate.yml` runs the validation CLI; trigger via Actions → Artifact Validate with artifact/manifest/root/device inputs.
+11) Training smoke: `make train-smoke` runs mini-train + validator + eval; CI job `training-smoke` runs the same.
+12) Full training via Makefile:
+   - `make train` runs DQN self-play using the YAML config at `CONFIG` (default `configs/dqn_train.yaml`), then calls the metrics plotter. Override config path with `CONFIG=<path>`. Env vars can still override YAML values.
+
+### Gameplay loop (frontend)
+- Click **Start Game** to enter placement mode, then place your fleet by selecting 17 tiles (5+4+3+3+2). Only your ships are shown.
+- Hit **Confirm placements** to start; the agent auto-places its ships and your grid keeps ships visible (`⬢` for unhit).
+- Fire by clicking the Agent Board. The game ends when one fleet is sunk; restart repeats the placement flow.
+- Ships must follow Battleship rules: each ship is a straight, contiguous line (horizontal or vertical) and ships cannot overlap; use the orientation toggle while placing.
 
 ## Structure (see `CODE_MAP.md` for more)
 - `docs/`: Design/requirements/test/obs/security/deployment/planning/backlog

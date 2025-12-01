@@ -14,6 +14,7 @@
 - `OBSERVABILITY_ENABLED` (default: true): Toggle metrics/tracing emission.
 - `DETERMINISTIC_MODE` (default: false): If true, seed/stub inference for tests/local dev.
 - `MAX_ACTIVE_GAMES` (default: 100): Soft cap for concurrent in-memory sessions.
+- Reward shaping (training): `REWARD_STEP_BASE` (default -0.05), `REWARD_STEP_DECAY` (0), `REWARD_STEP_CAP` (-0.5), `REWARD_HIT` (1.0), `REWARD_MISS` (0.0), `REWARD_SINK_MULT` (1.0), `REWARD_WIN_MAX` (5.0), `REWARD_WIN_DECAY_K` (82.0), `REWARD_PERFECT_MOVE` (17), `REWARD_LOSS` (-10.0); self-play promotion gate on average moves via `DQN_MOVE_GATE` (optional).
 
 ## Files and Paths
 - `.env` for local development; never commit secrets.

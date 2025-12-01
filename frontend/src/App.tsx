@@ -10,6 +10,13 @@ interface BoardProps {
 }
 
 function Board({ grid, label, disabled, onCellClick }: BoardProps) {
+  const renderSymbol = (cell: CellState) => {
+    if (cell === 'unknown') return '';
+    if (cell === 'ship') return '⬢';
+    if (cell === 'miss') return '•';
+    return '×';
+  };
+
   return (
     <div aria-label={label} className="card">
       <div className="status-line" style={{ marginBottom: 8 }}>
@@ -26,7 +33,7 @@ function Board({ grid, label, disabled, onCellClick }: BoardProps) {
                 onClick={() => onCellClick && onCellClick(x, y)}
                 aria-label={`${label} cell ${x},${y} (${cell})`}
               >
-                {cell === 'unknown' ? '' : cell === 'miss' ? '•' : '×'}
+                {renderSymbol(cell)}
               </button>
             ))}
           </div>
@@ -55,6 +62,15 @@ const statusCopy: Record<GameStatus | 'ready', string> = {
 const isReady = (val: ReadyResponse | { status: 'checking' | 'error'; reason?: string }): val is ReadyResponse =>
   val.status === 'ready';
 
+const SHIPS = [
+  { name: 'Carrier', size: 5 },
+  { name: 'Battleship', size: 4 },
+  { name: 'Cruiser', size: 3 },
+  { name: 'Submarine', size: 3 },
+  { name: 'Destroyer', size: 2 },
+];
+const FLEET_SIZE = SHIPS.reduce((sum, ship) => sum + ship.size, 0);
+
 function App() {
   const [board, setBoard] = useState<CellState[][]>(emptyBoard(10));
   const [agentBoard, setAgentBoard] = useState<CellState[][]>(emptyBoard(10));
@@ -66,6 +82,10 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<ReadyResponse | { status: 'checking' | 'error'; reason?: string }>({ status: 'checking' });
   const [modelMeta, setModelMeta] = useState<{ version?: string; hash?: string }>({});
+  const [placementMode, setPlacementMode] = useState(false);
+  const [placementMap, setPlacementMap] = useState<Record<string, number[][]>>({});
+  const [currentShipIdx, setCurrentShipIdx] = useState(0);
+  const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
 
   useEffect(() => {
     fetchReadiness()
@@ -86,17 +106,53 @@ function App() {
     return { tone: 'error', text: 'Not ready' };
   }, [readiness]);
 
+  function resetPlacement() {
+    const size = board.length || 10;
+    setPlacementMode(true);
+    setPlacementMap({});
+    setCurrentShipIdx(0);
+    setOrientation('horizontal');
+    setBoard(emptyBoard(size));
+    setAgentBoard(emptyBoard(size));
+    setGameId(null);
+    setStatus('ready');
+    setLogs([{ tone: 'info', message: 'Placement mode: click a cell to place each ship in order.' }]);
+  }
+
+  const playerGrid = useMemo(() => {
+    if (!placementMode) return board;
+    const preview = emptyBoard(board.length || 10);
+    Object.values(placementMap).forEach((coords) => {
+      coords.forEach(([x, y]) => {
+        preview[y][x] = 'ship';
+      });
+    });
+    return preview;
+  }, [board, placementMode, placementMap]);
+
   async function handleStart() {
-    setLoading(true);
     setError(null);
+    // First click enters placement mode; second confirms once fleet is placed.
+    if (!placementMode) {
+      resetPlacement();
+      return;
+    }
+    if (Object.keys(placementMap).length !== SHIPS.length) {
+      setError(`Place all ships (${FLEET_SIZE} cells) before starting.`);
+      return;
+    }
+    setLoading(true);
     try {
-      const res = await startGame();
+      const placementPayload = buildPlacementsPayload();
+      const res = await startGame(placementPayload);
       setGameId(res.game_id);
       setBoard(res.board);
       setAgentBoard(res.agent_board_masked);
       setStatus(res.status);
       setModelMeta({ version: res.model_version, hash: res.model_hash });
-      setLogs([{ tone: 'info', message: 'Game started. Take your shot.' }]);
+      setLogs([{ tone: 'info', message: 'Fleet deployed. Take your shot.' }]);
+      setPlacementMode(false);
+      setPlacementMap({});
     } catch (err: any) {
       const mapped = mapError(err);
       setError(mapped.message);
@@ -142,6 +198,47 @@ function App() {
     }
   }
 
+  function placeShip(x: number, y: number) {
+    if (!placementMode) return; // placements only in placement mode
+    setError(null);
+    const ship = SHIPS[currentShipIdx];
+    if (!ship) return;
+    const coords =
+      orientation === 'horizontal'
+        ? Array.from({ length: ship.size }, (_, i) => [x + i, y])
+        : Array.from({ length: ship.size }, (_, i) => [x, y + i]);
+    if (coords.some(([cx, cy]) => cx < 0 || cy < 0 || cx >= board.length || cy >= board.length)) {
+      setError('Ship does not fit on the board with this orientation.');
+      return;
+    }
+    const occupied = new Set<string>();
+    Object.entries(placementMap).forEach(([name, coords]) => {
+      if (name === ship.name) return;
+      coords.forEach((c) => occupied.add(c.join(',')));
+    });
+    if (coords.some((c) => occupied.has(c.join(',')))) {
+      setError('Ships cannot overlap.');
+      return;
+    }
+    const nextMap = { ...placementMap, [ship.name]: coords };
+    setPlacementMap(nextMap);
+    if (currentShipIdx < SHIPS.length - 1) {
+      setCurrentShipIdx(currentShipIdx + 1);
+    }
+  }
+
+  function buildPlacementsPayload():
+    | { placements: { name: string; coordinates: number[][] }[] }
+    | undefined {
+    const placementsList: { name: string; coordinates: number[][] }[] = [];
+    for (const ship of SHIPS) {
+      const coords = placementMap[ship.name];
+      if (!coords || coords.length !== ship.size) return undefined;
+      placementsList.push({ name: ship.name, coordinates: coords });
+    }
+    return { placements: placementsList };
+  }
+
   async function handleQuit() {
     if (!gameId) return;
     setLoading(true);
@@ -160,7 +257,9 @@ function App() {
   }
 
   const isFinished = status !== 'in_progress' && status !== 'ready';
-  const moveDisabled = !gameId || moveLoading || isFinished;
+  const moveDisabled = !gameId || moveLoading || isFinished || placementMode;
+  const startLabel = placementMode ? 'Confirm placements' : 'Start Game';
+  const currentShip = placementMode ? SHIPS[currentShipIdx] : null;
 
   return (
     <div className="app-shell">
@@ -178,13 +277,44 @@ function App() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="controls">
           <button className="button" onClick={handleStart} disabled={loading} aria-busy={loading}>
-            {gameId ? 'Restart' : 'Start Game'}
+            {startLabel}
           </button>
           <button className="button secondary" onClick={handleQuit} disabled={!gameId || loading}>
             Quit
           </button>
           <span style={{ color: 'var(--muted)', fontSize: 14 }}>API: {API_BASE}</span>
         </div>
+        {placementMode && currentShip && (
+          <div className="status-line" style={{ marginTop: 10, gap: 12, flexWrap: 'wrap' }}>
+            <span>
+              Placing: <strong>{currentShip.name}</strong> (size {currentShip.size})
+            </span>
+            <button
+              className="button secondary"
+              onClick={() => setOrientation((prev) => (prev === 'horizontal' ? 'vertical' : 'horizontal'))}
+              type="button"
+            >
+              Orientation: {orientation === 'horizontal' ? 'Horizontal' : 'Vertical'}
+            </button>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {SHIPS.map((ship, idx) => (
+                <button
+                  key={ship.name}
+                  className="button secondary"
+                  type="button"
+                  onClick={() => setCurrentShipIdx(idx)}
+                  aria-pressed={currentShipIdx === idx}
+                  style={{
+                    borderColor: currentShipIdx === idx ? 'var(--accent)' : undefined,
+                    color: currentShipIdx === idx ? 'var(--accent)' : undefined,
+                  }}
+                >
+                  {ship.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {error && (
           <div role="alert" className="message error" style={{ marginTop: 10 }}>
             {error}
@@ -193,7 +323,12 @@ function App() {
       </div>
 
       <div className="board-wrap" aria-live="polite">
-        <Board grid={board} label="Your Board (incoming shots)" disabled onCellClick={undefined} />
+        <Board
+          grid={playerGrid}
+          label={placementMode ? 'Your Board (place your ships)' : 'Your Board (your fleet)'}
+          disabled={Boolean(gameId) && !placementMode}
+          onCellClick={placementMode ? placeShip : undefined}
+        />
         <Board
           grid={agentBoard}
           label="Agent Board (click to fire)"

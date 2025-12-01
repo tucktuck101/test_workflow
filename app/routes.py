@@ -34,6 +34,16 @@ def _render_hits(board_size: int, hits: dict) -> List[List[str]]:
     return board
 
 
+def _render_player_board(session: engine.GameSession) -> List[List[str]]:
+    board = _blank_board(session.board_size)
+    for ship in session.player_ships:
+        for x, y in ship.coordinates:
+            board[y][x] = "ship"
+    for (x, y), outcome in session.player_board_hits.items():
+        board[y][x] = outcome.value
+    return board
+
+
 def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Observability) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["gameplay"])
     session_store = engine.InMemorySessionStore(settings.max_active_games, ttl_seconds=3600)
@@ -71,14 +81,15 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
                         placements=ships,
                         deterministic_seed=settings.deterministic_mode and 0 or None,
                     )
+                    session_store.add(session)
                 else:
                     session = session_store.create(
                         board_size=settings.board_size, deterministic_seed=settings.deterministic_mode and 0 or None
                     )
-            except engine.InvalidMove:
-                raise_http("capacity_exceeded", {"retry_after": 5})
+            except engine.InvalidMove as exc:
+                raise_http(str(exc))
 
-        player_board = _blank_board(settings.board_size)
+        player_board = _render_player_board(session)
         agent_board = _blank_board(settings.board_size)
         return GameStartResponse(
             game_id=session.game_id,
@@ -144,7 +155,7 @@ def get_router(app: FastAPI, settings: Settings, loader: ModelLoader, obs: Obser
                 outcome=agent_result["outcome"],
                 ship=agent_result.get("ship"),
             ),
-            board=_render_hits(session.board_size, session.player_board_hits),
+            board=_render_player_board(session),
             agent_board_masked=_render_hits(session.board_size, session.agent_board_hits),
             status=session.status.value,
         )

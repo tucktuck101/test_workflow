@@ -1,0 +1,41 @@
+{
+  "version": "dev",
+  "hash": "a0eeeb8f815e3cc72cd4533e0350d3267edf372d495153d751468ad7d82b038a",
+  "device": "cpu",
+  "artifact": "model.bin",
+  "board_size": 10,
+  "allow_adjacent": true,
+  "ships": [
+    [
+      "Carrier",
+      5
+    ],
+    [
+      "Battleship",
+      4
+    ],
+    [
+      "Cruiser",
+      3
+    ],
+    [
+      "Submarine",
+      3
+    ],
+    [
+      "Destroyer",
+      2
+    ]
+  ],
+  "seed": 0,
+  "episodes": 10000,
+  "lr": 0.01,
+  "epsilon": 0.2,
+  "epsilon_decay": 0.997,
+  "mean_reward": 14.385124999999983,
+  "selfplay_win_rate": 0.532,
+  "selfplay_mean_moves": 85.378,
+  "selfplay_eval_games": 500,
+  "selfplay_threshold": 0.6,
+  "opponent_snapshot_size": 100
+}

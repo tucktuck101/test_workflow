@@ -10,6 +10,7 @@ from .env import BattleshipEnv, Coordinate
 class QLearner:
     env: BattleshipEnv
     epsilon: float = 0.2
+    epsilon_decay: float = 0.99
     lr: float = 0.1
     gamma: float = 0.95
 
@@ -20,11 +21,11 @@ class QLearner:
     def _key(self, action: Coordinate) -> Tuple[int, int]:
         return action
 
-    def select_action(self) -> Coordinate:
+    def select_action(self, explore: bool = True) -> Coordinate:
         actions = self.env.available_actions()
         if not actions:
             return (0, 0)
-        if self.rng.random() < self.epsilon:
+        if explore and self.rng.random() < self.epsilon:
             return self.rng.choice(actions)
         # exploit: pick max Q
         best = max(actions, key=lambda a: self.q.get(self._key(a), 0.0))
@@ -52,11 +53,26 @@ class QLearner:
             total_reward += reward
         return total_reward
 
-    def train(self, episodes: int) -> List[float]:
+    def train(self, episodes: int, progress_cb=None) -> List[float]:
         rewards = []
-        for _ in range(episodes):
-            rewards.append(self.train_episode())
+        for ep in range(1, episodes + 1):
+            reward = self.train_episode()
+            rewards.append(reward)
+            # decay epsilon per episode
+            self.epsilon *= self.epsilon_decay
+            if progress_cb:
+                progress_cb(ep, reward, self.epsilon)
         return rewards
+
+    def greedy_episode(self) -> float:
+        self.env.reset()
+        total_reward = 0.0
+        done = False
+        while not done:
+            action = self.select_action(explore=False)
+            reward, done = self.env.step(action)
+            total_reward += reward
+        return total_reward
 
     def export_policy(self) -> Dict[str, float]:
         # export as flat map key="x,y" -> q-value
