@@ -1,0 +1,47 @@
+version: v1
+phases:
+  - id: bootcamp
+    name: Boot Camp
+    description: Small board warm-up against simple opponents.
+    gating:
+      min_episodes: 0
+      min_win_rate: 0.0
+    opponents:
+      - opponent: random
+        weight: 0.7
+      - opponent: hunt_target
+        weight: 0.3
+    hyperparams:
+      train:
+        board_size: 5
+        allow_adjacent: false
+      dqn:
+        epsilon_start: 1.0
+        epsilon_end: 0.1
+        epsilon_decay: 4000
+      selfplay:
+        eval_games: 50
+        eval_threshold: 0.4
+
+  - id: skirmish
+    name: Skirmish Control
+    description: Medium board with stronger scripted opponents.
+    gating:
+      min_episodes: 2000
+      min_rounds: 1
+      min_win_rate: 0.55
+    opponents:
+      - opponent: hunt_target
+        weight: 0.5
+      - opponent: probability
+        weight: 0.5
+    hyperparams:
+      train:
+        board_size: 8
+      dqn:
+        epsilon_start: 0.5
+        epsilon_end: 0.05
+        epsilon_decay: 6000
+      selfplay:
+        eval_games: 75
+        eval_threshold: 0.65

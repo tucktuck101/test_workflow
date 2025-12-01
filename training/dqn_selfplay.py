@@ -1,8 +1,8 @@
 import csv
 import json
 import math
-import sys
 import os
+import sys
 from collections import deque, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -11,6 +11,7 @@ from typing import Deque, List, Optional, Tuple
 
 import numpy as np
 
+from training.curriculum import CurriculumConfig, load_curriculum
 from training.config import TrainConfig
 from training.config_loader import apply_overrides, dataclass_field_names, load_yaml_config, validate_values, validate_yaml_sections
 from training.env import DEFAULT_SHIPS
@@ -890,7 +891,7 @@ def evaluate_policy(
     return wins / games, summaries
 
 
-def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfig, opponent_type: Optional[str] = None) -> dict:
+def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfig, opponent_type: Optional[str] = None, curriculum: Optional[CurriculumConfig] = None) -> dict:
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     debug = os.getenv("DQN_DEBUG", "0").lower() in {"1", "true", "yes", "on"}
     env_params = {
@@ -1185,6 +1186,11 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 "baseline_threshold": sp_cfg.baseline_threshold,
                 "run_id": run_id,
             }
+            if curriculum:
+                manifest["curriculum"] = {
+                    "version": curriculum.version,
+                    "phases": [p.id for p in curriculum.phases],
+                }
             manifest_path = cfg.output_dir / "manifest.json"
             manifest_path.write_text(json.dumps(manifest, indent=2))
             summary = {
@@ -1197,6 +1203,8 @@ def run_dqn_selfplay(cfg: TrainConfig, dqn_cfg: DQNConfig, sp_cfg: SelfPlayConfi
                 "baseline_games": sp_cfg.baseline_games,
                 "baseline_threshold": sp_cfg.baseline_threshold,
             }
+            if curriculum:
+                summary["curriculum"] = {"version": curriculum.version, "phases": [p.id for p in curriculum.phases]}
             summary_path = cfg.output_dir / f"dqn_selfplay_run-{run_id}.json"
             summary_path.write_text(json.dumps(summary, indent=2))
             return summary
@@ -1212,6 +1220,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run DQN self-play training")
     parser.add_argument("--opponent", choices=["random", "hunt_target", "probability"], default=None, help="Scripted opponent for evaluation (baseline/random by default)")
     parser.add_argument("--config", type=str, default=None, help="Path to YAML config for training")
+    parser.add_argument("--curriculum", type=str, default=None, help="Path to curriculum YAML (falls back to configs/curriculum.default.yaml)")
     args = parser.parse_args()
 
     yaml_data = {}
@@ -1233,6 +1242,7 @@ def main() -> None:
     dqn_data = yaml_data.get("dqn", {}) if yaml_data else {}
     sp_data = yaml_data.get("selfplay", {}) if yaml_data else {}
     yaml_opponent = yaml_data.get("opponent") if yaml_data else None
+    curriculum_spec = yaml_data.get("curriculum") if yaml_data else None
 
     if train_data:
         apply_overrides(cfg, train_data)
@@ -1245,8 +1255,17 @@ def main() -> None:
     validate_values(cfg, dqn_cfg, sp_cfg)
 
     opponent = args.opponent or yaml_opponent
+    try:
+        if isinstance(curriculum_spec, dict):
+            curriculum = load_curriculum(data=curriculum_spec)
+        elif args.curriculum or curriculum_spec:
+            curriculum = load_curriculum(args.curriculum or curriculum_spec)
+        else:
+            curriculum = load_curriculum()
+    except Exception as exc:  # pragma: no cover - defensive top-level guard
+        raise SystemExit(f"Failed to load curriculum: {exc}") from exc
 
-    result = run_dqn_selfplay(cfg, dqn_cfg, sp_cfg, opponent_type=opponent)
+    result = run_dqn_selfplay(cfg, dqn_cfg, sp_cfg, opponent_type=opponent, curriculum=curriculum)
     print(json.dumps(result, indent=2))
 
 
