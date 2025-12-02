@@ -4,6 +4,7 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
+import jsonschema
 import yaml
 
 
@@ -53,8 +54,8 @@ def expect_type(name: str, val: Any, typ):
 
 def validate_values(train: Any, dqn: Any, sp: Any) -> None:
     # Train
-    if train.board_size <= 0:
-        raise ValueError("board_size must be > 0")
+    if train.board_size != 10:
+        raise ValueError("board_size must be fixed to 10")
     if train.reward_win_decay_k < 0:
         raise ValueError("reward_win_decay_k must be >= 0")
     if train.reward_step_cap > train.reward_step_base:
@@ -75,3 +76,12 @@ def validate_values(train: Any, dqn: Any, sp: Any) -> None:
         raise ValueError("batch_size must be > 0")
     if sp.rollout_workers <= 0 or sp.eval_workers <= 0 or sp.baseline_workers <= 0:
         raise ValueError("worker counts must be > 0")
+
+
+def validate_schema(cfg: dict[str, Any], schema_path: str | Path) -> None:
+    """Validate a config dict against the provided JSON Schema."""
+    schema_file = Path(schema_path)
+    if not schema_file.exists():
+        raise FileNotFoundError(f"Schema file not found: {schema_file}")
+    schema = yaml.safe_load(schema_file.read_text())
+    jsonschema.validate(instance=cfg, schema=schema)

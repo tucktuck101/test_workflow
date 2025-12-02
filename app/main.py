@@ -75,7 +75,7 @@ def run_stub() -> None:
     os.environ.setdefault("MODEL_VERSION", "stub")  # pragma: no cover
     os.environ.setdefault("MODEL_HASH", stub_hash)  # pragma: no cover
     os.environ.setdefault("MODEL_DEVICE", "cpu")  # pragma: no cover
-    os.environ.setdefault("BOARD_SIZE", "5")  # pragma: no cover
+    os.environ.setdefault("BOARD_SIZE", "10")  # pragma: no cover
     os.environ.setdefault("DETERMINISTIC_MODE", "true")  # pragma: no cover
     os.environ.setdefault("MAX_ACTIVE_GAMES", "5")  # pragma: no cover
     os.environ.setdefault("API_PORT", "8000")  # pragma: no cover

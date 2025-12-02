@@ -58,12 +58,12 @@ class TrainConfig:
         device = os.getenv("TRAIN_DEVICE", "cpu")
         epochs = int(os.getenv("TRAIN_EPOCHS", "1"))
         lr = float(os.getenv("TRAIN_LR", "0.01"))
-        board_size = int(os.getenv("TRAIN_BOARD_SIZE", "10"))
+        board_size = 10
         version = os.getenv("TRAIN_VERSION", "dev")
         epsilon = float(os.getenv("TRAIN_EPSILON", "0.2"))
         epsilon_decay = float(os.getenv("TRAIN_EPSILON_DECAY", "0.99"))
         log_interval = max(1, int(os.getenv("TRAIN_LOG_INTERVAL", "10")))
-        allow_adjacent = _parse_bool(os.getenv("TRAIN_ALLOW_ADJACENT", "true"), True)
+        allow_adjacent = True
         reward_step_base = float(os.getenv("REWARD_STEP_BASE", "-0.05"))
         reward_step_decay = float(os.getenv("REWARD_STEP_DECAY", "0.0"))
         reward_step_cap = float(os.getenv("REWARD_STEP_CAP", "-0.5"))

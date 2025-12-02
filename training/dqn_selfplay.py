@@ -17,6 +17,7 @@ from training.config_loader import (
     apply_overrides,
     dataclass_field_names,
     load_yaml_config,
+    validate_schema,
     validate_values,
     validate_yaml_sections,
 )
@@ -435,6 +436,33 @@ class NumpyDQN:
         else:
             twin.w3, twin.b3 = self.w3.copy(), self.b3.copy()
         return twin
+
+    def to_payload(self) -> dict:
+        data: dict = {
+            "model_type": self.model_type,
+            "use_dueling": self.use_dueling,
+            "board_size": self.board_size if self.board_size is not None else -1,
+            "input_channels": self.input_channels if self.input_channels is not None else -1,
+            "conv_channels": np.array(self.conv_channels),
+        }
+        if self.model_type == "cnn":
+            data.update(
+                {
+                    "conv1": self.conv1,
+                    "conv1_b": self.conv1_b,
+                    "conv2": self.conv2,
+                    "conv2_b": self.conv2_b,
+                    "fc": self.fc,
+                    "fc_b": self.fc_b,
+                }
+            )
+        else:
+            data.update({"w1": self.w1, "b1": self.b1, "w2": self.w2, "b2": self.b2})
+        if self.use_dueling:
+            data.update({"wv": self.wv, "bv": self.bv, "wa": self.wa, "ba": self.ba})
+        else:
+            data.update({"w3": self.w3, "b3": self.b3})
+        return data
 
     def _conv2d(self, x: np.ndarray, weight: np.ndarray, b: np.ndarray, padding: int = 1):
         batch, _, h, w_in = x.shape
@@ -1174,8 +1202,14 @@ def run_dqn_selfplay(
         eps_min = dqn_cfg.epsilon_min
         eps_decay = (dqn_cfg.epsilon_start - eps_min) / max(1, dqn_cfg.epsilon_decay)
 
-    metrics_path = sp_cfg.metrics_path or (cfg.output_dir / f"dqn_selfplay_metrics-{run_id}.csv")
-    progress_path = sp_cfg.progress_path or (cfg.output_dir / f"dqn_progress-{run_id}.jsonl")
+    metrics_path = sp_cfg.metrics_path or (
+        cfg.output_dir
+        / f"dqn_selfplay_metrics-{datetime.now(timezone.utc).strftime('%y-%m-%d-%H-%M')}.csv"
+    )
+    progress_path = sp_cfg.progress_path or (
+        cfg.output_dir
+        / f"dqn_progress-{datetime.now(timezone.utc).strftime('%y-%m-%d-%H-%M')}.jsonl"
+    )
     log_counter = 1
 
     def dlog(msg: str) -> None:
@@ -1488,6 +1522,9 @@ def run_dqn_selfplay(
             )
 
         snapshot = q_net.copy()
+        snap_path = cfg.output_dir / f"model_snapshot{round_idx}_{datetime.utcnow().strftime('%y-%m-%d-%H-%M')}.bin"
+        snap_path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(snap_path, **snapshot.to_payload())
         eval_opponent = phase_opponent if phase_opponent else snapshot
         wr, eval_summaries = evaluate_policy(
             q_net,
@@ -1666,10 +1703,18 @@ def main() -> None:
         required = ["train", "dqn", "selfplay"]
         allowed = {
             "train": dataclass_field_names(TrainConfig),
-            "dqn": dataclass_field_names(DQNConfig),
+            "dqn": dataclass_field_names(DQNConfig) | {"dueling"},  # legacy alias
             "selfplay": dataclass_field_names(SelfPlayConfig),
         }
+        # Normalize legacy/alias keys before validation
+        if "dqn" in yaml_data:
+            dqn_section = yaml_data.get("dqn") or {}
+            if "dueling" in dqn_section and "use_dueling" not in dqn_section:
+                dqn_section["use_dueling"] = dqn_section["dueling"]
+            yaml_data["dqn"] = dqn_section
         validate_yaml_sections(yaml_data, required, allowed)
+        schema_path = Path(__file__).resolve().parent.parent / "configs" / "dqn_train.schema.yaml"
+        validate_schema(yaml_data, schema_path)
 
     cfg = TrainConfig.from_env()
     dqn_cfg = DQNConfig.from_env()
@@ -1683,6 +1728,11 @@ def main() -> None:
 
     if train_data:
         apply_overrides(cfg, train_data)
+        cfg.board_size = 10
+        cfg.allow_adjacent = True
+        cfg.ships = None
+        if not isinstance(cfg.output_dir, Path):
+            cfg.output_dir = Path(cfg.output_dir).expanduser().resolve()
     if dqn_data:
         apply_overrides(dqn_cfg, dqn_data)
         if isinstance(dqn_cfg.conv_channels, list):

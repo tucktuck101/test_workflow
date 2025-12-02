@@ -71,19 +71,6 @@ properties:
             train:
               type: object
               properties:
-                board_size:
-                  type: integer
-                  minimum: 2
-                allow_adjacent:
-                  type: boolean
-                ships:
-                  type: array
-                  items:
-                    type: array
-                    items:
-                      - type: string
-                      - type: integer
-                  minItems: 2
                 reward_step_base:
                   type: number
                 reward_step_decay:

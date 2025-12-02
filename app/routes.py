@@ -1,6 +1,7 @@
 import logging
 import random
 import time
+from pathlib import Path
 from typing import Callable, List, Literal, Tuple
 
 from fastapi import APIRouter, FastAPI, Request
@@ -23,6 +24,9 @@ from .schemas import (
     MoveRequest,
     MoveResponse,
     MoveResult,
+    ModelInfo,
+    ModelListResponse,
+    ModelLoadRequest,
     PlayerType,
     QuitResponse,
     TrainingMetricsResponse,
@@ -125,6 +129,7 @@ def _auto_play(
         try:
             player_move = player_policy(session)
             engine.apply_player_move(session, player_move)
+            time.sleep(1.0)
         except engine.InvalidMove:
             # Skip invalid/duplicate moves and continue auto-play.
             continue
@@ -133,6 +138,7 @@ def _auto_play(
         try:
             agent_move = agent_policy(session)
             engine.apply_agent_move(session, agent_move)
+            time.sleep(1.0)
         except engine.InvalidMove:
             continue
     return session
@@ -155,6 +161,81 @@ def get_router(
     )
     trainer_orch: TrainerOrchestrator = trainer_orchestrator or DummyTrainerOrchestrator()
     rate_limiter = SimpleRateLimiter(capacity=5, refill_rate_per_sec=1.0, retry_after=5)
+
+    def _hash_file(path: Path) -> str:
+        import hashlib
+
+        hasher = hashlib.sha256()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+
+    def _list_models() -> List[ModelInfo]:
+        models: List[ModelInfo] = []
+        root = settings.model_root
+        for path in sorted(root.glob("model*.bin")) + sorted(root.glob("*.npz")):
+            try:
+                digest = _hash_file(path)
+            except Exception:
+                continue
+            info = ModelInfo(
+                name=path.name,
+                path=str(path),
+                hash=digest,
+                size_bytes=path.stat().st_size,
+                modified_at=path.stat().st_mtime,
+                version=path.stem,
+            )
+            models.append(info)
+        return models
+
+    def _active_info() -> ModelInfo:
+        p = loader.model_path
+        return ModelInfo(
+            name=p.name,
+            path=str(p),
+            hash=loader.expected_hash,
+            size_bytes=p.stat().st_size if p.exists() else 0,
+            modified_at=p.stat().st_mtime if p.exists() else 0.0,
+            version=loader.model_version,
+        )
+
+    @router.get("/models", response_model=ModelListResponse)
+    def list_models() -> ModelListResponse:
+        return ModelListResponse(active=_active_info() if loader.ready else None, models=_list_models())
+
+    @router.get("/models/active", response_model=ModelInfo)
+    def active_model() -> ModelInfo:
+        if not loader.ready:
+            raise_http("model_not_ready", {"reason": loader.error})
+        return _active_info()
+
+    @router.post("/models/load", response_model=ModelInfo)
+    def load_model(payload: ModelLoadRequest) -> ModelInfo:
+        nonlocal agent_adapter
+        candidate = settings.model_root / payload.name
+        try:
+            candidate.resolve().relative_to(settings.model_root.resolve())
+        except Exception:
+            raise_http("invalid_payload", {"reason": "path_outside_root"})
+        if not candidate.exists() or not candidate.is_file():
+            raise_http("invalid_payload", {"reason": "model_not_found"})
+        digest = _hash_file(candidate)
+        version = payload.version or candidate.stem
+        device = (payload.device or settings.model_device).lower()
+        try:
+            loader.load(candidate, version, device)
+        except Exception as exc:
+            raise_http("invalid_payload", {"reason": str(exc)})
+        settings.model_path = candidate
+        settings.model_hash = digest
+        settings.model_version = version
+        settings.model_device = device
+        agent_adapter = agent.AgentAdapter(
+            deterministic=settings.deterministic_mode, policy_path=candidate
+        )
+        return _active_info()
 
     @router.post(
         "/games",
@@ -365,7 +446,12 @@ def get_router(
             },
         )
         return TrainingRunResponse(
-            run_id=run.run_id, status=run.status, config=run.config, error=run.error
+            run_id=run.run_id,
+            status=run.status,
+            config=run.config,
+            error=run.error,
+            created_at=run.created_at,
+            updated_at=run.updated_at,
         )
 
     @router.get(
@@ -379,7 +465,12 @@ def get_router(
             raise_http("training_not_found")
         assert run is not None
         return TrainingRunResponse(
-            run_id=run.run_id, status=run.status, config=run.config, error=run.error
+            run_id=run.run_id,
+            status=run.status,
+            config=run.config,
+            error=run.error,
+            created_at=run.created_at,
+            updated_at=run.updated_at,
         )
 
     @router.post(
@@ -393,7 +484,12 @@ def get_router(
             raise_http("training_not_found")
         assert run is not None
         return TrainingRunResponse(
-            run_id=run.run_id, status=run.status, config=run.config, error=run.error
+            run_id=run.run_id,
+            status=run.status,
+            config=run.config,
+            error=run.error,
+            created_at=run.created_at,
+            updated_at=run.updated_at,
         )
 
     @router.get(
@@ -425,6 +521,6 @@ def get_health_router(settings: Settings, loader: ModelLoader) -> APIRouter:
     def ready() -> dict:
         if not loader.ready:
             raise_http("model_not_ready", {"reason": loader.error})
-        return readiness_payload(settings)
+        return readiness_payload(settings, loader)
 
     return router

@@ -4,6 +4,8 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app /app/app
+COPY bots /app/bots
+COPY training /app/training
 COPY models /app/models
 EXPOSE 8000
 ENV MODEL_PATH=/app/models/stub_model.bin \

@@ -8,9 +8,8 @@ services:
     environment:
       - MODEL_PATH=/app/artifacts/model.bin
       - MODEL_VERSION=trained-v1
-      - MODEL_HASH=53a9ed9fd60ea58fb6bbe76fc0a2751534046270b127697a114e6543363bbc2d
+      - MODEL_HASH=2dde10fabc6539387e48ec9583f2d71f7fd837203dab28472207b8684bd4fc42
       - MODEL_DEVICE=cpu
-      - BOARD_SIZE=10
       - LOG_LEVEL=debug
       - OBSERVABILITY_ENABLED=true
       - DETERMINISTIC_MODE=false
@@ -49,8 +48,6 @@ services:
       - TRAIN_EPOCHS=100
       - TRAIN_SEED=42
       - TRAIN_DEVICE=cpu
-      - TRAIN_BOARD_SIZE=10
-      - TRAIN_ALLOW_ADJACENT=true
     volumes:
       - ./configs:/app/configs:ro
       - ./artifacts:/app/artifacts

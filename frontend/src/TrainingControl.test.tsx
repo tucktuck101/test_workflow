@@ -7,7 +7,7 @@ const runningResponse = { run_id: 'r1', status: 'running', config: {} };
 const canceledResponse = { run_id: 'r1', status: 'canceled', config: {} };
 
 describe('TrainingControl', () => {
-  it('starts a training run with YAML config', async () => {
+  it('starts a training run with form values', async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith('/api/training/runs'))
         return new Response(JSON.stringify(runResponse), { status: 200 });
@@ -23,19 +23,14 @@ describe('TrainingControl', () => {
     vi.stubGlobal('fetch', fetchMock as any);
 
     render(<TrainingControl />);
+
+    fireEvent.change(screen.getByLabelText(/epochs/i), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText(/seed/i), { target: { value: '7' } });
+    fireEvent.change(screen.getAllByLabelText(/lr/i)[0], { target: { value: '0.02' } });
     fireEvent.click(screen.getByRole('button', { name: /start training/i }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/Started training/));
     expect(fetchMock).toHaveBeenCalled();
-  });
-
-  it('handles YAML parse errors', async () => {
-    render(<TrainingControl />);
-    const textarea = screen.getByLabelText(/Training YAML/i);
-    fireEvent.change(textarea, { target: { value: '::bad' } });
-    fireEvent.click(screen.getByRole('button', { name: /start training/i }));
-    await screen.findByRole('alert');
-    expect(screen.getByRole('alert')).toHaveTextContent(/Invalid YAML/);
   });
 
   it('can cancel a run', async () => {

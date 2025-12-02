@@ -12,9 +12,6 @@ phases:
       - opponent: hunt_target
         weight: 0.3
     hyperparams:
-      train:
-        board_size: 5
-        allow_adjacent: false
       dqn:
         epsilon_start: 1.0
         epsilon_end: 0.1
@@ -36,8 +33,6 @@ phases:
       - opponent: probability
         weight: 0.5
     hyperparams:
-      train:
-        board_size: 8
       dqn:
         epsilon_start: 0.5
         epsilon_end: 0.05

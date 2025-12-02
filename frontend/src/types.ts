@@ -40,6 +40,8 @@ export interface TrainingRunResponse {
   status: TrainingRunStatus;
   config: Record<string, unknown>;
   error?: string | null;
+  created_at?: number;
+  updated_at?: number;
 }
 
 export interface TrainingMetricsResponse {
@@ -84,4 +86,19 @@ export interface ReadyResponse {
   model_version: string;
   model_hash: string;
   device: string;
+}
+
+export interface ModelInfo {
+  name: string;
+  path: string;
+  hash: string;
+  size_bytes: number;
+  modified_at: number;
+  version?: string;
+  device?: string;
+}
+
+export interface ModelListResponse {
+  active: ModelInfo | null;
+  models: ModelInfo[];
 }

@@ -9,6 +9,8 @@ import type {
   PlayerType,
   TrainingRunResponse,
   TrainingMetricsResponse,
+  ModelListResponse,
+  ModelInfo,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -85,6 +87,20 @@ export async function cancelTraining(runId: string): Promise<TrainingRunResponse
 export async function getTrainingMetrics(runId: string): Promise<TrainingMetricsResponse> {
   const res = await fetch(buildUrl(`/api/training/runs/${runId}/metrics`));
   return handle<TrainingMetricsResponse>(res);
+}
+
+export async function listModels(): Promise<ModelListResponse> {
+  const res = await fetch(buildUrl('/api/models'));
+  return handle<ModelListResponse>(res);
+}
+
+export async function loadModel(name: string): Promise<ModelInfo> {
+  const res = await fetch(buildUrl('/api/models/load'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  return handle<ModelInfo>(res);
 }
 
 export function mapError(err: ApiError): { tone: 'error' | 'warn'; message: string } {

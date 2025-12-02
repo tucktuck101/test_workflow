@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict
 
 from .config import Settings
+from .model_loader import ModelLoader
 from .errors import raise_http
 
 
@@ -14,8 +15,8 @@ def _sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
-def readiness_payload(settings: Settings) -> Dict:
-    path = settings.model_path
+def readiness_payload(settings: Settings, loader: ModelLoader) -> Dict:
+    path = loader.model_path
     if settings.model_root:
         try:
             path.resolve().relative_to(settings.model_root.resolve())
@@ -31,12 +32,12 @@ def readiness_payload(settings: Settings) -> Dict:
     except Exception:
         raise_http("model_not_ready", {"reason": "hash_compute_failed"})
 
-    if digest.lower() != settings.model_hash.lower():
+    if digest.lower() != loader.expected_hash.lower():
         raise_http("model_not_ready", {"reason": "hash_mismatch"})
 
     return {
         "status": "ready",
-        "model_version": settings.model_version,
-        "model_hash": settings.model_hash,
-        "device": settings.model_device,
+        "model_version": loader.model_version,
+        "model_hash": loader.expected_hash,
+        "device": loader.device,
     }

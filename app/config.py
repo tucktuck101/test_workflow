@@ -83,6 +83,8 @@ class Settings:
             raise ValueError("MODEL_DEVICE must be one of: cpu, cuda.")
 
         board_size = _parse_int(env.get("BOARD_SIZE", "10"), "BOARD_SIZE", min_value=1)
+        if board_size != 10:
+            raise ValueError("BOARD_SIZE is fixed to 10 for this project.")
 
         log_level = env.get("LOG_LEVEL", "info").lower()
         if log_level not in {"debug", "info", "warning", "error", "critical"}:

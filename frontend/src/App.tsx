@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { API_BASE, fetchReadiness, makeMove, mapError, quitGame, startGame } from './api';
-import type { CellState, GameStatus, MoveResponse, PlayerType, ReadyResponse } from './types';
+import {
+  API_BASE,
+  fetchReadiness,
+  listModels,
+  loadModel,
+  makeMove,
+  mapError,
+  quitGame,
+  startGame,
+} from './api';
+import type {
+  CellState,
+  GameStatus,
+  ModelInfo,
+  MoveResponse,
+  PlayerType,
+  ReadyResponse,
+} from './types';
 
 interface BoardProps {
   grid: CellState[][];
@@ -81,10 +97,13 @@ function App() {
   const [playerType, setPlayerType] = useState<PlayerType>('human');
   const [agentType, setAgentType] = useState<PlayerType>('dqn_agent');
   const [autoPlay, setAutoPlay] = useState<boolean>(false);
+  const [autoPlayIntervalMs, setAutoPlayIntervalMs] = useState(1000);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [moveLoading, setMoveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [modelLoading, setModelLoading] = useState(false);
   const [readiness, setReadiness] = useState<
     ReadyResponse | { status: 'checking' | 'error'; reason?: string }
   >({ status: 'checking' });
@@ -104,6 +123,19 @@ function App() {
       .catch((err) => {
         const mapped = mapError(err);
         setReadiness({ status: 'error', reason: mapped.message });
+      });
+  }, []);
+
+  useEffect(() => {
+    listModels()
+      .then((res) => {
+        setModels(res.models);
+        if (res.active) {
+          setModelMeta({ version: res.active.version, hash: res.active.hash });
+        }
+      })
+      .catch(() => {
+        /* ignore */
       });
   }, []);
 
@@ -362,6 +394,59 @@ function App() {
           <button className="button secondary" onClick={handleQuit} disabled={!gameId || loading}>
             Quit
           </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label htmlFor="model-select">Model</label>
+            <select
+              id="model-select"
+              value=""
+              onChange={(e) => {
+                const name = e.target.value;
+                if (!name) return;
+                setModelLoading(true);
+                loadModel(name)
+                  .then((info) => {
+                    setModelMeta({ version: info.version, hash: info.hash });
+                    setReadiness({
+                      status: 'ready',
+                      model_version: info.version || name,
+                      model_hash: info.hash,
+                      device: info.device || 'cpu',
+                    } as any);
+                  })
+                  .catch((err) => {
+                    const mapped = mapError(err);
+                    setError(mapped.message);
+                  })
+                  .finally(() => setModelLoading(false));
+              }}
+              disabled={modelLoading}
+            >
+              <option value="">Select model</option>
+              {Array.isArray(models) &&
+                models.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name}
+                  </option>
+                ))}
+            </select>
+            <button
+              className="button secondary"
+              onClick={() => {
+                setModelLoading(true);
+                listModels()
+                  .then((res) => {
+                    setModels(res.models);
+                    if (res.active) {
+                      setModelMeta({ version: res.active.version, hash: res.active.hash });
+                    }
+                  })
+                  .finally(() => setModelLoading(false));
+              }}
+              disabled={modelLoading}
+            >
+              Refresh
+            </button>
+          </div>
           <span style={{ color: 'var(--muted)', fontSize: 14 }}>API: {API_BASE}</span>
         </div>
         <p style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>

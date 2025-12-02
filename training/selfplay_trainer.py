@@ -217,7 +217,10 @@ def run_selfplay(config: TrainConfig, self_cfg: SelfPlayConfig) -> Dict[str, str
     rewards: List[float] = []
     wins = 0
     snapshot_policy: Optional[PolicyMap] = None
-    metrics_path = self_cfg.metrics_path or (config.output_dir / f"selfplay_metrics-{run_id}.csv")
+    metrics_path = self_cfg.metrics_path or (
+        config.output_dir
+        / f"selfplay_metrics-{datetime.now(timezone.utc).strftime('%y-%m-%d-%H-%M')}.csv"
+    )
     metric_fields = [
         "phase",
         "round",
@@ -253,6 +256,7 @@ def run_selfplay(config: TrainConfig, self_cfg: SelfPlayConfig) -> Dict[str, str
     )
 
     baseline_win_rate: Optional[float] = None
+    snapshot_idx = 1
 
     for round_idx in range(1, self_cfg.max_rounds + 1):
         for ep in range(1, chunk + 1):
@@ -283,6 +287,13 @@ def run_selfplay(config: TrainConfig, self_cfg: SelfPlayConfig) -> Dict[str, str
             learner.epsilon *= learner.epsilon_decay
             if global_ep % self_cfg.snapshot_interval == 0:
                 snapshot_policy = _policy_to_tuple_map(learner.export_policy())
+                snap_path = (
+                    config.output_dir
+                    / f"model_snapshot{snapshot_idx}_{datetime.utcnow().strftime('%y-%m-%d-%H-%M')}.bin"
+                )
+                snap_path.parent.mkdir(parents=True, exist_ok=True)
+                snap_path.write_text(json.dumps(snapshot_policy, sort_keys=True))
+                snapshot_idx += 1
             if (
                 global_ep == 1
                 or global_ep % config.log_interval == 0

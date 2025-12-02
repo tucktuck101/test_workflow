@@ -82,6 +82,8 @@ class TrainingRunResponse(BaseModel):
     status: RunStatus
     config: dict
     error: Optional[str] = None
+    created_at: float | None = None
+    updated_at: float | None = None
 
 
 class TrainingMetricsResponse(BaseModel):
@@ -91,3 +93,23 @@ class TrainingMetricsResponse(BaseModel):
 
 class TrainingRunCreateRequest(BaseModel):
     config: dict | None = None
+
+
+class ModelInfo(BaseModel):
+    name: str
+    path: str
+    hash: str
+    size_bytes: int
+    modified_at: float
+    version: Optional[str] = None
+
+
+class ModelListResponse(BaseModel):
+    active: ModelInfo | None = None
+    models: List[ModelInfo]
+
+
+class ModelLoadRequest(BaseModel):
+    name: str
+    version: Optional[str] = None
+    device: Optional[str] = None

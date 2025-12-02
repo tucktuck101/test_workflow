@@ -58,3 +58,19 @@ class ModelLoader:
     def assert_ready(self) -> None:
         if not self.ready:
             raise RuntimeError(self.error or "model_not_ready")
+
+    def load(self, path: Path, version: str, device: str) -> None:
+        """Reload the model from a new path, recomputing hash and readiness."""
+        self.model_path = path
+        self.model_version = version
+        self.device = device
+        try:
+            self._validate_root()
+            self._validate_path()
+            self.expected_hash = self._sha256()
+            self._validate_hash()
+            self.ready = True
+            self.error = None
+        except Exception as exc:
+            self.ready = False
+            self.error = str(exc)
