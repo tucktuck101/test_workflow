@@ -1,0 +1,54 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    volumes:
+      - ./artifacts:/app/artifacts:ro
+    environment:
+      - MODEL_PATH=/app/artifacts/model.bin
+      - MODEL_VERSION=trained-v1
+      - MODEL_HASH=2dde10fabc6539387e48ec9583f2d71f7fd837203dab28472207b8684bd4fc42
+      - MODEL_DEVICE=cpu
+      - LOG_LEVEL=debug
+      - OBSERVABILITY_ENABLED=true
+      - DETERMINISTIC_MODE=false
+      - FRONTEND_ORIGIN=http://localhost:3000
+      - TRAINING_FRONTEND_ORIGIN=http://localhost:3001
+    ports:
+      - '8000:8000'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health/ready']
+      interval: 10s
+      timeout: 2s
+      retries: 5
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    ports:
+      - '3000:80'
+  training-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.training-frontend
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    ports:
+      - '3001:80'
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.trainer
+    environment:
+      - TRAIN_OUTPUT=/app/artifacts
+      - TRAIN_ARTIFACT_NAME=model.bin
+      - TRAIN_EPOCHS=100
+      - TRAIN_SEED=42
+      - TRAIN_DEVICE=cpu
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./artifacts:/app/artifacts
+    command: ['python', '-m', 'training.trainer']

@@ -1,0 +1,14 @@
+fastapi==0.123.0
+starlette==0.49.1
+uvicorn==0.32.1
+pytest==8.1.1
+httpx==0.27.0
+pytest-cov==4.1.0
+opentelemetry-api==1.26.0
+opentelemetry-sdk==1.26.0
+numpy==2.1.1
+matplotlib==3.10.7
+pandas==2.2.3
+pyyaml==6.0.2
+types-PyYAML==6.0.12.20250915
+jsonschema==4.25.1

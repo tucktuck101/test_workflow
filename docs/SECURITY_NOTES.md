@@ -4,14 +4,14 @@
 - Input validation: strict coordinate and game-state validation; reject invalid/duplicate/out-of-order moves; enforce bounds on payload sizes.
 - Data handling: no PII stored; in-memory game state only; model artifacts read-only and verified by hash.
 - Dependencies: run dependency and secrets scanning in CI; prefer maintained, open-source packages.
-- Config/secrets: use env vars for keys/paths; avoid committing secrets; support k8s secrets later.
+- Config/secrets: use env vars for keys/paths; avoid committing secrets; support k8s secrets later. CI runs pip-audit, npm audit (frontend), and gitleaks (PR + history via fetch-depth=0).
 - Networking: add rate limiting/DoS protections when exposed beyond local; keep backend authoritative to prevent client-side tampering; consider simple request shaping/backoff.
 - Threats to note:
   - Tampered clients sending invalid coordinates or replaying moves → handled by validation and status checks.
   - DoS via spamming game creation/moves → mitigate with rate limits and caps on active sessions per client/IP.
   - Model integrity risk → verify hash on startup; fail readiness if mismatch.
   - Path traversal on model path → restrict to configured directory and validate path.
-- Logging: avoid storing payloads; ensure no secrets or model paths beyond necessity; structured logs with game_id only.
+- Logging: avoid storing payloads, coordinates, or model paths; ensure no secrets; structured logs with game_id only. If needing payload samples, gate behind debug and scrub coordinates.
 
 ## Threat Model (STRIDE-lite, key surfaces)
 - Start game (`POST /api/games`): abuse via creation spam → mitigated by `MAX_ACTIVE_GAMES` cap (429) and planned per-IP rate limits; malformed payloads → schema validation with size bounds; tampered model readiness → readiness gate blocks.
@@ -26,6 +26,7 @@
 - Integrity: SHA256 verification of model artifacts; restrict load path to configured root; deterministic mode gated to non-production use.
 - Least privilege: run without elevated perms; avoid writing model directories; keep dependencies minimal and scanned.
 - Observability safeguards: structured logs with `game_id`, no payloads or secrets; metrics/traces avoid high-cardinality user data.
+- HTTP headers: backend uses FastAPI defaults; when behind proxy, add standard security headers (CORS limited to configured origin, X-Content-Type-Options, X-Frame-Options). Frontend served as static assets; consider `helmet`-style headers at ingress level.
 
 ## Log Scrubbing Rules
 - Do not log request bodies, coordinates, or model paths by default; emit coarse validation error codes only.

@@ -1,30 +1,43 @@
-# Contributing Guide (Codex Contract v1.4)
+# Contributing Guide
+
+This repo has active backend, frontend, training, and container code. Before changing anything, read `AGENTS.md` for the current Codex operating rules, `docs/README.md` for docs trust order and navigation, and `docs/CURRENT_STATE.md` for the source-verified project snapshot.
 
 ## Workflow
-- Work via Issues/PRs; use templates in `.github/`.
-- Branches: `feature/<desc>`, `fix/<desc>`, `epic/<id>-<desc>`, `proposal/<decision-id>-<desc>` for speculative/high-risk work.
-- Apply tag scheme per PROCESS_CHECKLIST (`epic-<id>-start`, `epic-<id>-feature-<name>-done`, `epic-<id>-complete`).
-- ADRs required for material decisions (stack, persistence, infra, cost guardrails, architecture shifts). Existing ADRs: 0001–0003.
+- Work through focused branches and PRs when using remote collaboration.
+- Inspect `git status --short --branch` before editing.
+- Preserve unrelated dirty worktree changes.
+- Use `rg --files` and targeted `rg` searches to find source truth.
+- Treat older planning docs as historical until verified against code, tests, configs, or recent diffs.
+- Use ADRs for material architecture, persistence, infra, cost, or security decisions.
 
-## Quality Gates (risk: medium, tier: standard)
-- Tests: unit + API/contract for start/move/quit; deterministic/stubbed inference tests; coverage targets (engine ≥90%, backend 85–90%, frontend 70–80%).
-- Security: dependency + secrets scanning; SAST/IaC where available.
-- Observability: metrics/logs/traces for start/move/quit and inference; update OBSERVABILITY_SPEC when adding operations.
-- Coverage guardrail: avoid >2pp drop on affected components without justification in PR.
-- Critic Pass required before merge; red-flag human review for auth, data schema/migrations, public API changes, and security-sensitive logic.
+## Quality Gates
+- Choose checks based on the files touched and the risk of the change.
+- Use backend tests for `app/`, `training/`, `bots/`, `tools/`, and config-affecting changes.
+- Use frontend tests/type checks for `frontend/` changes.
+- Use smoke or e2e checks for cross-service behavior.
+- Avoid coverage drops on touched components without a clear reason in the PR.
+- Do not fabricate or bypass test, coverage, security, or readiness results.
 
-## Pre-commit and CI
-- Install hooks: `pre-commit install`. Run `pre-commit run -a` before pushing.
-- CI: `.github/workflows/ci.yml` runs pre-commit, quality gates (`ci/run_quality_gates.sh`). Keep npm/pytest/mypy scripts current.
+## Useful Commands
+- `make backend-test`
+- `make backend-coverage`
+- `make frontend-test`
+- `make train-smoke`
+- `make smoke`
+- `make run`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run test:e2e`
 
 ## Documentation Expectations
-- Update docstrings/public API docs for non-trivial modules.
-- Keep CODE_MAP.md current after structural changes; update EPIC_LOG.md at epic start/finish.
-- Update REQ/ARCH/API/TEST/OBS/SECURITY/DEPLOYMENT docs when behaviour or contracts change.
+- Update `docs/CURRENT_STATE.md` when a verified repo fact changes.
+- Update `CODE_MAP.md` when subsystem boundaries, entrypoints, or command surfaces change.
+- Keep README user-facing and concise.
+- Keep generated artifacts out of documentation unless the task is specifically about artifacts.
 
-## Observability & Logging
-- Structured logs only; no secrets or payload dumps. Include `game_id`, outcome, model metadata; avoid coordinates/high-cardinality fields.
-- Metrics and traces must cover primary operations; see `docs/OBSERVABILITY_SPEC.md` for required signals.
+## Generated Files
+Do not review, edit, or commit generated outputs unless explicitly requested. Normal navigation should ignore `artifacts/`, `frontend/dist/`, `frontend/dist-training/`, `frontend/coverage/`, caches, local virtualenvs, `git_diag_*`, and `screencaps/`.
 
-## Environment/Config
-- Use `.env.example` as a template; do not commit secrets. Required envs for runtime: `MODEL_PATH`, `MODEL_VERSION`, `MODEL_HASH`, `MODEL_DEVICE`, `BOARD_SIZE`, `MAX_ACTIVE_GAMES`, `DETERMINISTIC_MODE`, `LOG_LEVEL`, `OBSERVABILITY_ENABLED`.
+## Security And Cost
+- Do not commit secrets or local `.env` files.
+- Do not introduce paid services, billable infrastructure, or cloud resources without explicit approval.
+- Keep logs free of secrets and unnecessary payload dumps.

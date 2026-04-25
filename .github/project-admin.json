@@ -1,0 +1,49 @@
+{
+  "project": {
+    "owner": "tucktuck101",
+    "numberEnv": "PROJECT_NUMBER",
+    "title": "Battleships RL Platform Delivery"
+  },
+  "fields": {
+    "boardColumn": "Board Column",
+    "type": "Type",
+    "component": "Component",
+    "environment": "Environment",
+    "risk": "Risk",
+    "agentStatus": "Agent Status",
+    "humanReview": "Human Review",
+    "releaseImageTag": "Release/Image Tag",
+    "modelVersion": "Model Version",
+    "deploymentStatus": "Deployment Status"
+  },
+  "defaults": {
+    "environment": "ci",
+    "risk": "medium",
+    "agentStatus": "ready",
+    "humanReview": "needed"
+  },
+  "labels": {
+    "needsInfo": "needs-info",
+    "agentReady": "agent-ready",
+    "sourceCi": "source: ci",
+    "deployment": "deployment",
+    "incident": "Incident"
+  },
+  "types": ["Epic", "Feature", "Task", "Bug", "ADR", "Incident"],
+  "components": {
+    "backend": ["app/", "tests/", "Dockerfile.backend", "requirements", "pyproject.toml"],
+    "frontend": ["frontend/", "Dockerfile.frontend", "Dockerfile.training-frontend"],
+    "training": ["training/", "configs/", "scripts/train_smoke.sh", "tools/"],
+    "ci-cd": [".github/", "ci/", "docker-compose", "Dockerfile", "scripts/smoke"],
+    "infra": ["k8s/"],
+    "docs": ["docs/", "README.md", "CODE_MAP.md", "CONTRIBUTING.md"],
+    "model": ["models/", "artifacts/"]
+  },
+  "taskRequiredSections": [
+    "Parent Feature",
+    "Summary",
+    "Desired Behavior",
+    "Test & Validation Requirements",
+    "Acceptance Criteria"
+  ]
+}

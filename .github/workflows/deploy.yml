@@ -1,0 +1,176 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        type: choice
+        options:
+          - local-demo
+          - k3s-prod
+      backend_image:
+        description: Backend image tag to deploy
+        required: true
+      frontend_image:
+        description: Gameplay frontend image tag to deploy
+        required: true
+      training_ui_image:
+        description: Training UI image tag to deploy
+        required: true
+      rollback_to:
+        description: Optional backend image tag to roll back to if deployment fails
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+  packages: read
+
+jobs:
+  local-demo:
+    if: inputs.environment == 'local-demo'
+    runs-on: ubuntu-latest
+    environment: local-demo
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull requested images
+        env:
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
+          TRAINING_UI_IMAGE: ${{ inputs.training_ui_image }}
+        run: docker compose -f docker-compose.ci.yml pull backend frontend training-ui
+      - name: Smoke requested images
+        env:
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
+          TRAINING_UI_IMAGE: ${{ inputs.training_ui_image }}
+          COMPOSE_NO_BUILD: 'true'
+        run: ./scripts/smoke_local.sh
+      - name: Record deployment evidence
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              'Deployment evidence',
+              `Environment: ${context.payload.inputs.environment}`,
+              `Backend: ${context.payload.inputs.backend_image}`,
+              `Frontend: ${context.payload.inputs.frontend_image}`,
+              `Training UI: ${context.payload.inputs.training_ui_image}`,
+              `Actor: ${context.actor}`,
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `DEPLOY: ${context.payload.inputs.environment} ${new Date().toISOString()}`,
+              body,
+              labels: ['deployment'],
+            });
+      - name: Record deployment failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              'Deployment failure',
+              `Environment: ${context.payload.inputs.environment}`,
+              `Backend: ${context.payload.inputs.backend_image}`,
+              `Frontend: ${context.payload.inputs.frontend_image}`,
+              `Training UI: ${context.payload.inputs.training_ui_image}`,
+              `Rollback target: ${context.payload.inputs.rollback_to || 'not provided'}`,
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `BUG: deployment failed for ${context.payload.inputs.environment}`,
+              body,
+              labels: ['Bug', 'deployment', 'Incident'],
+            });
+
+  k3s-prod:
+    if: inputs.environment == 'k3s-prod'
+    runs-on: [self-hosted, k3s, battleship]
+    environment: k3s-prod
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply manifests
+        run: kubectl apply -k k8s/overlays/k3s
+      - name: Set runtime images
+        run: |
+          kubectl -n battleships set image deployment/battleships-backend backend="${{ inputs.backend_image }}"
+          kubectl -n battleships set image deployment/battleships-frontend frontend="${{ inputs.frontend_image }}"
+          kubectl -n battleships set image deployment/battleships-training-ui training-ui="${{ inputs.training_ui_image }}"
+      - name: Wait for rollout
+        run: |
+          kubectl -n battleships rollout status deployment/battleships-backend --timeout=180s
+          kubectl -n battleships rollout status deployment/battleships-frontend --timeout=180s
+          kubectl -n battleships rollout status deployment/battleships-training-ui --timeout=180s
+      - name: Smoke backend through port-forward
+        run: |
+          kubectl -n battleships port-forward svc/battleships-backend 18000:8000 &
+          PF_PID=$!
+          trap 'kill $PF_PID || true' EXIT
+          for _ in {1..30}; do
+            if curl -sf http://localhost:18000/health/ready >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl -sf -X POST http://localhost:18000/api/games
+      - name: Roll back backend image
+        if: failure() && inputs.rollback_to != ''
+        run: |
+          kubectl -n battleships set image deployment/battleships-backend backend="${{ inputs.rollback_to }}"
+          kubectl -n battleships rollout status deployment/battleships-backend --timeout=180s
+      - name: Record deployment evidence
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              'Deployment evidence',
+              `Environment: ${context.payload.inputs.environment}`,
+              `Backend: ${context.payload.inputs.backend_image}`,
+              `Frontend: ${context.payload.inputs.frontend_image}`,
+              `Training UI: ${context.payload.inputs.training_ui_image}`,
+              `Actor: ${context.actor}`,
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `DEPLOY: ${context.payload.inputs.environment} ${new Date().toISOString()}`,
+              body,
+              labels: ['deployment'],
+            });
+      - name: Record deployment failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              'Deployment failure',
+              `Environment: ${context.payload.inputs.environment}`,
+              `Backend: ${context.payload.inputs.backend_image}`,
+              `Frontend: ${context.payload.inputs.frontend_image}`,
+              `Training UI: ${context.payload.inputs.training_ui_image}`,
+              `Rollback target: ${context.payload.inputs.rollback_to || 'not provided'}`,
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `BUG: deployment failed for ${context.payload.inputs.environment}`,
+              body,
+              labels: ['Bug', 'deployment', 'Incident'],
+            });

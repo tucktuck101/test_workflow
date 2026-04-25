@@ -1,6 +1,6 @@
 # Vision
 
-- Build a production-ready Battleship web app where everyday users anonymously play against a pre-trained RL agent.
+- Build the Battleships RL Platform: a production-ready Battleships web app where everyday users anonymously play against a pre-trained RL agent.
 - Deliver smooth gameplay: land on homepage, start a game, play turns, quit gracefully.
 - Run locally first, but be deployment-ready for Kubernetes (dev/test/prod) with a separate training environment.
 - Keep MVP anonymous; add accounts/leaderboards later without blocking current scope.

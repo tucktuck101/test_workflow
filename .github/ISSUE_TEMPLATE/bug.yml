@@ -1,0 +1,114 @@
+name: 'Bug'
+description: Log a defect tied to a Parent Feature; fixes must go through Tasks.
+title: 'BUG-: '
+labels: ['Bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** Every Bug must have a Parent Feature. Do not fix directly; create one or more Tasks with the same Parent Feature and set Source Bug. Keep Fix Tasks checklist in sync. Close the Bug only when all Fix Tasks are done and acceptance is met.
+  - type: input
+    id: reference_id
+    attributes:
+      label: Reference ID (optional if using issue number)
+      placeholder: BUG-001
+  - type: input
+    id: parent_feature
+    attributes:
+      label: Parent Feature (FEAT-###)
+      placeholder: FEAT-001
+    validations:
+      required: true
+  - type: dropdown
+    id: detected_by
+    attributes:
+      label: Detected By
+      options:
+        - github-actions
+        - user
+        - codex
+        - other
+    validations:
+      required: true
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options:
+        - new
+        - triaged
+        - in progress
+        - fixed: pending verify
+        - done
+    validations:
+      required: true
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+    validations:
+      required: true
+  - type: textarea
+    id: failure_signature
+    attributes:
+      label: Failure Signature
+      description: Error message/pattern; include Signature Hash if known.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Workflow/job/branch/commit/actor/run URL or runtime context.
+    validations:
+      required: true
+  - type: textarea
+    id: error_details
+    attributes:
+      label: Error Details
+      description: Log snippet and link to full logs.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: dev/test/prod/local
+  - type: dropdown
+    id: suspected_category
+    attributes:
+      label: Suspected Category
+      options:
+        - test-failure
+        - infra
+        - flaky
+        - config
+        - dependency
+        - build
+        - unknown
+    validations:
+      required: true
+  - type: textarea
+    id: linked_items
+    attributes:
+      label: Linked Work Items
+      description: Parent Feature (required), Source Epic (if known), related FR/US/NFR.
+  - type: textarea
+    id: fix_tasks
+    attributes:
+      label: Fix Tasks (checklist of TASK IDs)
+      description: List TASK-### items created to fix this Bug.
+  - type: textarea
+    id: root_cause
+    attributes:
+      label: Root Cause Summary
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction / Rerun Instructions
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria for closing the Bug
+    validations:
+      required: true

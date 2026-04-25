@@ -1,0 +1,29 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+ARG MODEL_SOURCE=models/stub_model.bin
+ARG MODEL_VERSION=stub-v1
+ARG MODEL_HASH=9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e
+ARG MODEL_DEVICE=cpu
+COPY requirements.txt /app/requirements.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app /app/app
+COPY bots /app/bots
+COPY training /app/training
+COPY models /app/models
+COPY ${MODEL_SOURCE} /app/models/model.bin
+EXPOSE 8000
+ENV MODEL_PATH=/app/models/model.bin \
+    MODEL_ROOT=/app/models \
+    MODEL_VERSION=${MODEL_VERSION} \
+    MODEL_HASH=${MODEL_HASH} \
+    MODEL_DEVICE=${MODEL_DEVICE} \
+    BOARD_SIZE=10 \
+    LOG_LEVEL=info \
+    OBSERVABILITY_ENABLED=true \
+    DETERMINISTIC_MODE=true
+
+CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

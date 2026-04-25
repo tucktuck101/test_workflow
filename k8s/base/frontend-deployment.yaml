@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: battleships-frontend
+  namespace: battleships
+  labels:
+    app.kubernetes.io/name: battleships-frontend
+    app.kubernetes.io/part-of: battleships-rl-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: battleships-frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: battleships-frontend
+        app.kubernetes.io/part-of: battleships-rl-platform
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/tucktuck101/battleships-rl-platform-frontend:main
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

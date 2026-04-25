@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: battleship-trainer
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: trainer
+          image: ghcr.io/tucktuck101/battleships-rl-platform-trainer:main
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TRAIN_OUTPUT
+              value: /artifacts
+            - name: TRAIN_ARTIFACT_NAME
+              value: model.bin
+            - name: TRAIN_EPOCHS
+              value: '100'
+            - name: TRAIN_SEED
+              value: '1'
+            - name: TRAIN_DEVICE
+              value: cpu
+            - name: TRAIN_BOARD_SIZE
+              value: '10'
+            - name: TRAIN_ALLOW_ADJACENT
+              value: 'true'
+          volumeMounts:
+            - name: artifacts
+              mountPath: /artifacts
+            - name: configs
+              mountPath: /configs
+              readOnly: true
+          command: ['python', '-m', 'training.trainer']
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: battleship-artifacts
+        - name: configs
+          configMap:
+            name: battleship-configs

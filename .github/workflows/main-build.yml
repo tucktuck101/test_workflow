@@ -1,0 +1,88 @@
+name: Main Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_PREFIX: battleships-rl-platform
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      backend_image: ${{ steps.images.outputs.backend_image }}
+      frontend_image: ${{ steps.images.outputs.frontend_image }}
+      training_ui_image: ${{ steps.images.outputs.training_ui_image }}
+      trainer_image: ${{ steps.images.outputs.trainer_image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare image names
+        id: images
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          short_sha="${GITHUB_SHA::7}"
+          registry="ghcr.io/${owner}"
+          echo "backend_image=${registry}/${IMAGE_PREFIX}-backend:sha-${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=${registry}/${IMAGE_PREFIX}-frontend:sha-${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "training_ui_image=${registry}/${IMAGE_PREFIX}-training-ui:sha-${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "trainer_image=${registry}/${IMAGE_PREFIX}-trainer:sha-${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "BACKEND_MAIN=${registry}/${IMAGE_PREFIX}-backend:main" >> "$GITHUB_ENV"
+          echo "FRONTEND_MAIN=${registry}/${IMAGE_PREFIX}-frontend:main" >> "$GITHUB_ENV"
+          echo "TRAINING_UI_MAIN=${registry}/${IMAGE_PREFIX}-training-ui:main" >> "$GITHUB_ENV"
+          echo "TRAINER_MAIN=${registry}/${IMAGE_PREFIX}-trainer:main" >> "$GITHUB_ENV"
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push backend
+        run: |
+          docker build -f Dockerfile.backend -t "${{ steps.images.outputs.backend_image }}" -t "$BACKEND_MAIN" .
+          docker push "${{ steps.images.outputs.backend_image }}"
+          docker push "$BACKEND_MAIN"
+      - name: Build and push gameplay frontend
+        run: |
+          docker build -f Dockerfile.frontend -t "${{ steps.images.outputs.frontend_image }}" -t "$FRONTEND_MAIN" .
+          docker push "${{ steps.images.outputs.frontend_image }}"
+          docker push "$FRONTEND_MAIN"
+      - name: Build and push training UI
+        run: |
+          docker build -f Dockerfile.training-frontend -t "${{ steps.images.outputs.training_ui_image }}" -t "$TRAINING_UI_MAIN" .
+          docker push "${{ steps.images.outputs.training_ui_image }}"
+          docker push "$TRAINING_UI_MAIN"
+      - name: Build and push trainer
+        run: |
+          docker build -f Dockerfile.trainer -t "${{ steps.images.outputs.trainer_image }}" -t "$TRAINER_MAIN" .
+          docker push "${{ steps.images.outputs.trainer_image }}"
+          docker push "$TRAINER_MAIN"
+
+  registry-smoke:
+    runs-on: ubuntu-latest
+    needs: build-push
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull pushed images
+        env:
+          BACKEND_IMAGE: ${{ needs.build-push.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.build-push.outputs.frontend_image }}
+        run: docker compose -f docker-compose.ci.yml pull backend frontend
+      - name: Smoke pushed images
+        env:
+          BACKEND_IMAGE: ${{ needs.build-push.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.build-push.outputs.frontend_image }}
+          COMPOSE_NO_BUILD: 'true'
+        run: ./scripts/smoke_local.sh

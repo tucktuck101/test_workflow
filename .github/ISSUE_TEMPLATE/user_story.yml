@@ -1,0 +1,47 @@
+name: 'User Story (US)'
+description: Capture a user story (US-###) linked to a Functional Requirement.
+title: 'US-: '
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Codex Instructions:** Derive Features and Tasks from User Stories and linked FRs/NFRs. Implement via Tasks only.
+  - type: input
+    id: reference_id
+    attributes:
+      label: Reference ID
+      description: Format US-### (e.g., US-001)
+      placeholder: US-001
+    validations:
+      required: true
+  - type: input
+    id: parent_fr
+    attributes:
+      label: Parent Functional Requirement (FR-###)
+      placeholder: FR-001
+    validations:
+      required: true
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User Story
+      description: As a … I want … so that …
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Scenario Acceptance Criteria
+      description: Checklist or Gherkin scenarios.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies & Conditions
+  - type: textarea
+    id: traceability
+    attributes:
+      label: Traceability (BR/FR/NFR)
+      description: Reference related BR/FR/NFRs.

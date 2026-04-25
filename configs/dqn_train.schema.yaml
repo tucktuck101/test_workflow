@@ -1,0 +1,187 @@
+type: object
+required:
+  - train
+  - dqn
+  - selfplay
+additionalProperties: false
+properties:
+  train:
+    type: object
+    additionalProperties: false
+    required:
+      - output_dir
+      - artifact_name
+      - version
+    properties:
+      output_dir:
+        type: string
+        description: Directory where artifacts and manifests are written.
+      artifact_name:
+        type: string
+      seed:
+        type: integer
+        minimum: 0
+      device:
+        type: string
+        enum: [cpu, cuda]
+      epochs:
+        type: integer
+        minimum: 1
+      lr:
+        type: number
+        exclusiveMinimum: 0
+      version:
+        type: string
+      epsilon:
+        type: number
+        minimum: 0
+      epsilon_decay:
+        type: number
+        minimum: 0
+      log_interval:
+        type: integer
+        minimum: 1
+      reward_step_base:
+        type: number
+      reward_step_decay:
+        type: number
+      reward_step_cap:
+        type: number
+      reward_hit:
+        type: number
+      reward_miss:
+        type: number
+      reward_sink_mult:
+        type: number
+      reward_win_max:
+        type: number
+      reward_win_decay_k:
+        type: number
+      reward_loss:
+        type: number
+      reward_perfect_move:
+        type: integer
+        minimum: 1
+  dqn:
+    type: object
+    additionalProperties: false
+    properties:
+      gamma:
+        type: number
+        exclusiveMinimum: 0
+        maximum: 1
+      buffer_size:
+        type: integer
+        minimum: 1
+      batch_size:
+        type: integer
+        minimum: 1
+      target_update:
+        type: integer
+        minimum: 1
+      epsilon_start:
+        type: number
+      epsilon_end:
+        type: number
+      epsilon_min:
+        type: number
+      epsilon_decay:
+        type: integer
+        minimum: 1
+      lr:
+        type: number
+        exclusiveMinimum: 0
+      warmup_steps:
+        type: integer
+        minimum: 0
+      clip_norm:
+        type:
+          - number
+          - 'null'
+        minimum: 0
+      use_huber:
+        type: boolean
+      huber_delta:
+        type: number
+        exclusiveMinimum: 0
+      double_dqn:
+        type: boolean
+      use_dueling:
+        type: boolean
+      dueling:
+        type: boolean
+      model:
+        type: string
+        enum: [mlp, cnn]
+      hidden:
+        type: integer
+        minimum: 1
+      conv_channels:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: integer
+          minimum: 1
+  selfplay:
+    type: object
+    additionalProperties: false
+    properties:
+      chunk_episodes:
+        type: integer
+        minimum: 1
+      max_rounds:
+        type: integer
+        minimum: 1
+      max_episodes:
+        type:
+          - integer
+          - 'null'
+        minimum: 1
+      max_duration_sec:
+        type:
+          - integer
+          - 'null'
+        minimum: 1
+      snapshot_interval:
+        type: integer
+        minimum: 1
+      baseline_games:
+        type: integer
+        minimum: 0
+      baseline_threshold:
+        type: number
+        minimum: 0
+        maximum: 1
+      baseline_workers:
+        type: integer
+        minimum: 1
+      eval_games:
+        type: integer
+        minimum: 0
+      eval_threshold:
+        type: number
+        minimum: 0
+        maximum: 1
+      eval_workers:
+        type: integer
+        minimum: 1
+      loss_penalty:
+        type: number
+      metrics_path:
+        type: string
+      rollout_workers:
+        type: integer
+        minimum: 1
+      batch_size:
+        type: integer
+        minimum: 1
+      move_gate:
+        type:
+          - number
+          - 'null'
+        minimum: 0
+      progress_log:
+        type: boolean
+      progress_path:
+        type: string

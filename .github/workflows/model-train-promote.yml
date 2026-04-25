@@ -1,0 +1,104 @@
+name: Model Train And Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_version:
+        description: Model version to bake into the backend image
+        required: true
+        default: promoted-manual
+      epochs:
+        description: Training epochs for this promotion candidate
+        required: true
+        default: '10'
+  schedule:
+    - cron: '0 4 * * 1'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_PREFIX: battleships-rl-platform
+
+jobs:
+  train-validate:
+    runs-on: ubuntu-latest
+    outputs:
+      model_hash: ${{ steps.manifest.outputs.model_hash }}
+      model_version: ${{ steps.vars.outputs.model_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Resolve training inputs
+        id: vars
+        run: |
+          echo "model_version=${{ github.event.inputs.model_version || format('promoted-{0}', github.run_number) }}" >> "$GITHUB_OUTPUT"
+          echo "epochs=${{ github.event.inputs.epochs || '10' }}" >> "$GITHUB_OUTPUT"
+      - name: Train candidate model
+        env:
+          TRAIN_OUTPUT: promoted-model
+          TRAIN_ARTIFACT_NAME: model.bin
+          TRAIN_EPOCHS: ${{ steps.vars.outputs.epochs }}
+          TRAIN_VERSION: ${{ steps.vars.outputs.model_version }}
+          TRAIN_SEED: 123
+          TRAIN_DEVICE: cpu
+        run: python -m training.trainer
+      - name: Validate artifact
+        run: |
+          python -m tools.validate_artifact \
+            --artifact promoted-model/model.bin \
+            --manifest promoted-model/manifest.json \
+            --root promoted-model \
+            --device cpu
+      - name: Evaluate candidate
+        run: python -m training.eval --artifact promoted-model/model.bin --episodes 5 --board-size 5 --seed 123
+      - name: Read manifest
+        id: manifest
+        run: echo "model_hash=$(jq -r .hash promoted-model/manifest.json)" >> "$GITHUB_OUTPUT"
+      - name: Upload validated model
+        uses: actions/upload-artifact@v4
+        with:
+          name: promoted-model
+          path: |
+            promoted-model/model.bin
+            promoted-model/manifest.json
+          retention-days: 14
+
+  build-promoted-backend:
+    runs-on: ubuntu-latest
+    needs: train-validate
+    environment: model-promotion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: promoted-model
+          path: promoted-model
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push promoted backend image
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          short_sha="${GITHUB_SHA::7}"
+          image="ghcr.io/${owner}/${IMAGE_PREFIX}-backend:model-${{ needs.train-validate.outputs.model_version }}-${short_sha}"
+          docker build -f Dockerfile.backend \
+            --build-arg MODEL_SOURCE=promoted-model/model.bin \
+            --build-arg MODEL_VERSION="${{ needs.train-validate.outputs.model_version }}" \
+            --build-arg MODEL_HASH="${{ needs.train-validate.outputs.model_hash }}" \
+            --build-arg MODEL_DEVICE=cpu \
+            -t "$image" .
+          docker push "$image"
+          echo "Promoted backend image: $image" >> "$GITHUB_STEP_SUMMARY"
+          echo "Model hash: ${{ needs.train-validate.outputs.model_hash }}" >> "$GITHUB_STEP_SUMMARY"

@@ -1,13 +1,22 @@
-# Deployment (Plan)
+# Deployment
+
+Doc status: Reviewed  
+Capability status: Partial  
+Last verified: 2026-04-25  
+Review trigger: compose, Dockerfile, k8s manifest, or model lifecycle behavior changes.
+
+## Current Truth
+Local Docker Compose packaging exists for the backend, gameplay UI, training UI, and trainer service. Runtime readiness depends on configured model artifact path/version/hash/device values. Kubernetes manifests are present as a platform target, but API-triggered Kubernetes job orchestration is placeholder-backed in current source.
 
 ## Local (MVP)
 - Backend: Python/FastAPI app; run locally with uvicorn; loads static RL model artifact from local path.
-- Frontend: React/TypeScript dev server (Vite or similar); points to local API.
-- Config: environment variables for model path, feature toggles, ports, device selection; no secrets committed.
+- Frontend: React/TypeScript dev server (Vite) or built into nginx via Dockerfile.
+- Config: environment variables for model path, feature toggles, ports, device selection; no secrets committed. Stub model lives at `models/stub_model.bin`.
 - Health: use `/health/live` and `/health/ready` for basic checks; readiness tied to model load.
+- Devcontainer available in `.devcontainer/` for consistent Python/Node setup; Makefile targets wrap common commands.
 
 ## Containerization
-- Build separate images for backend and frontend; include model artifact via volume/mount or image layer for runtime.
+- Build separate images for backend and frontend; include model artifact via volume/mount or image layer for runtime. Dockerfiles provided for both; compose wires services with stub model defaults.
 - GPU support for training/inference images where available; default to CPU otherwise; make device configurable via env.
 - Backend image should verify model hash at startup and fail if mismatch.
 - Expose health endpoints; wire readiness/liveness probes in container configs.
@@ -27,6 +36,10 @@
 - Packaging options: (a) bake artifact into backend image layer for deterministic deploys; or (b) mount read-only volume/configured directory. Both carry version/hash metadata.
 - Promotion: training pipeline emits artifact + `version/hash/device` manifest; copy artifact + manifest into the runtime artifact store and update envs/ConfigMap; readiness must show new version/hash before traffic.
 - Rollback: keep N-1 artifact/manifest available; rollback by switching env/config to previous version/hash and redeploying; readiness blocks until hash matches.
+- Training stub: `python -m training.trainer` generates artifact + `manifest.json` (version/hash/device, seed/board metadata) for handoff to runtime. Deterministic by seed for CI/local use.
+- Validation: run `python -m tools.validate_artifact --artifact <file> --manifest <manifest> --root <MODEL_ROOT> --device <cpu|cuda>` before promotion; fail pipeline if not `status=ok`.
+- Promotion/rollback runbooks live in `docs/RUNBOOKS.md` (ensure N-1 manifest available for fast rollback).
+- CI helper: manual Action `artifact-validate` can be triggered with artifact/manifest/root/device inputs to run validation in GitHub-hosted runner.
 
 ## Probes and Runtime Settings
 - Liveness: `/health/live` (process up).
@@ -34,6 +47,34 @@
 - Resource tuning: default `MODEL_DEVICE=cpu`; enable `cuda` only when nodes support it; specify node selectors/tolerations for GPU workloads.
 - Concurrency/resource protection: `MAX_ACTIVE_GAMES` cap to avoid memory exhaustion; consider autoscaling on move latency and active games metrics.
 
+## Docker Compose (local)
+- `docker compose up --build` runs backend + gameplay frontend + training UI. Environment defaults to stub model hash/version; readiness is wired to compose healthcheck.
+- Gameplay UI uses `VITE_API_BASE_URL=http://backend:8000`; Training UI uses the same API base.
+- CORS: set `FRONTEND_ORIGIN` (game UI) and `TRAINING_FRONTEND_ORIGIN` (training UI) on the backend.
+
+## Split UIs
+- Gameplay UI (port 3000) and Training UI (port 3001) are separate containers.
+- Navigation: gameplay UI header links to the training UI; gameplay continues to work if training UI is down.
+- Trainer UI build: `npm run build:training` or `docker build -f Dockerfile.training-frontend -t training-ui .`
+
 ## Deterministic/Test Modes
 - `DETERMINISTIC_MODE=true` enables stubbed/deterministic agent and seeds; use only for tests/local debugging. Production should set false and rely on real model.
-- Ensure CI smoke tests run readiness after setting deterministic mode with stubbed artifact to keep pipelines fast.***
+- Ensure CI smoke tests run readiness after setting deterministic mode with stubbed artifact to keep pipelines fast.
+
+## Implemented
+- Separate backend, gameplay frontend, training frontend, and trainer Dockerfiles.
+- Docker Compose service wiring for backend, gameplay UI on 3000, training UI on 3001, and trainer.
+- Backend readiness healthcheck against `/health/ready`.
+- Environment-driven model artifact, CORS, observability, and deterministic-mode settings.
+
+## Planned
+- Validated Kubernetes deployment/job path with environment-specific command variants.
+- Real API-triggered Compose/Kubernetes trainer execution.
+- Formal promotion pipeline that updates runtime config only after artifact validation passes.
+
+## Roadmap
+- Keep compose defaults synchronized with `docker-compose.yml` and config requirements in `app/config.py`.
+- Treat k8s docs as deployment targets until command evidence proves them.
+
+## Verification
+Reconciled on 2026-04-25 against `docker-compose.yml`, `Dockerfile.backend`, `Dockerfile.frontend`, `Dockerfile.training-frontend`, `Dockerfile.trainer`, `app/config.py`, and `app/health.py`.

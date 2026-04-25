@@ -1,0 +1,62 @@
+enabled: true
+branches: []
+
+workflows:
+  - name: PR CI
+    default_parent_feature: FEAT-CI-GENERAL
+    default_category: test-failure
+    jobs:
+      - name: backend
+        parent_feature: FEAT-CI-QUALITY
+        category: test-failure
+        component: backend
+      - name: quality-gates
+        parent_feature: FEAT-CI-QUALITY
+        category: test-failure
+        component: ci-cd
+      - name: frontend
+        parent_feature: FEAT-CI-QUALITY
+        category: test-failure
+        component: frontend
+      - name: training-smoke
+        parent_feature: FEAT-CI-TRAINING
+        category: test-failure
+        component: training
+      - name: docker-build
+        parent_feature: FEAT-CI-CD
+        category: build
+        component: ci-cd
+      - name: compose-smoke
+        parent_feature: FEAT-CI-CD
+        category: infra
+        component: ci-cd
+      - name: e2e
+        parent_feature: FEAT-CI-QUALITY
+        category: test-failure
+        component: frontend
+      - name: security
+        parent_feature: FEAT-CI-SECURITY
+        category: dependency
+        component: ci-cd
+      - name: workflow-lint
+        parent_feature: FEAT-CI-CD
+        category: config
+        component: ci-cd
+
+triage_labels:
+  needed: 'triage: needed'
+  feature_needed: 'triage: feature-needed'
+  source_ci: 'source: ci'
+  type_bug: 'Bug'
+
+dedupe:
+  window_runs: 50
+  throttle_minutes: 60
+
+ignore:
+  workflows: []
+  jobs: []
+  error_patterns: []
+
+ownership:
+  owners: [] # optional: [{feature: FEAT-CI-QUALITY, assignees: ["owner1"]}]
