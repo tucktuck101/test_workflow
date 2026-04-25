@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: battleships-backend
+  namespace: battleships
+  labels:
+    app.kubernetes.io/name: battleships-backend
+spec:
+  selector:
+    app.kubernetes.io/name: battleships-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: battleships-frontend
+  namespace: battleships
+  labels:
+    app.kubernetes.io/name: battleships-frontend
+spec:
+  selector:
+    app.kubernetes.io/name: battleships-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: battleships-training-ui
+  namespace: battleships
+  labels:
+    app.kubernetes.io/name: battleships-training-ui
+spec:
+  selector:
+    app.kubernetes.io/name: battleships-training-ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

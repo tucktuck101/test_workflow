@@ -1,7 +1,6 @@
 import hashlib
 import json
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
@@ -48,8 +47,6 @@ def write_manifest(
 
 
 def run_training(config: TrainConfig) -> Dict[str, str]:
-    timestamp = datetime.utcnow().strftime("%y-%m-%d-%H-%M")
-    artifact_name = f"model_{timestamp}.bin"
     env = BattleshipEnv(
         board_size=config.board_size,
         seed=config.seed,
@@ -91,7 +88,7 @@ def run_training(config: TrainConfig) -> Dict[str, str]:
             )
 
     rewards = learner.train(config.epochs, progress_cb=progress)
-    artifact_path = config.output_dir / artifact_name
+    artifact_path = config.output_dir / config.artifact_name
     artifact_hash = write_artifact(artifact_path, learner.export_policy())
     manifest_path = write_manifest(config.output_dir, artifact_path, config, artifact_hash, rewards)
     print(

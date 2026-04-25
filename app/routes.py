@@ -21,12 +21,12 @@ from .schemas import (
     GameConfig,
     GameCreateRequest,
     GameStartResponse,
-    MoveRequest,
-    MoveResponse,
-    MoveResult,
     ModelInfo,
     ModelListResponse,
     ModelLoadRequest,
+    MoveRequest,
+    MoveResponse,
+    MoveResult,
     PlayerType,
     QuitResponse,
     TrainingMetricsResponse,
@@ -203,7 +203,9 @@ def get_router(
 
     @router.get("/models", response_model=ModelListResponse)
     def list_models() -> ModelListResponse:
-        return ModelListResponse(active=_active_info() if loader.ready else None, models=_list_models())
+        return ModelListResponse(
+            active=_active_info() if loader.ready else None, models=_list_models()
+        )
 
     @router.get("/models/active", response_model=ModelInfo)
     def active_model() -> ModelInfo:

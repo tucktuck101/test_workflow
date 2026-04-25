@@ -38,14 +38,14 @@ dqn:
   gamma: 0.95
 
 selfplay:
-  chunk_episodes: 100
-  max_rounds: 5
-  snapshot_interval: 200
+  chunk_episodes: 10000
+  max_rounds: 20
+  snapshot_interval: 50000
   baseline_games: 20
-  baseline_threshold: 0.6
+  baseline_threshold: 0.8
   baseline_workers: 2
-  eval_games: 20
-  eval_threshold: 0.7
+  eval_games: 2000
+  eval_threshold: 0.8
   eval_workers: 2
   loss_penalty: 5.0
   rollout_workers: 2

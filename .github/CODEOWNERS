@@ -1,0 +1,11 @@
+# CI/CD, deployment, runtime config, and model promotion paths require human review.
+/.github/ @tucktuck101
+/Dockerfile* @tucktuck101
+/docker-compose*.yml @tucktuck101
+/k8s/ @tucktuck101
+/app/config.py @tucktuck101
+/app/health.py @tucktuck101
+/docs/DEPLOYMENT.md @tucktuck101
+/docs/RUNBOOKS.md @tucktuck101
+/docs/ml/ @tucktuck101
+/scripts/bootstrap/ @tucktuck101

@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: battleships-training-ui
+  namespace: battleships
+  labels:
+    app.kubernetes.io/name: battleships-training-ui
+    app.kubernetes.io/part-of: battleships-rl-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: battleships-training-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: battleships-training-ui
+        app.kubernetes.io/part-of: battleships-rl-platform
+    spec:
+      containers:
+        - name: training-ui
+          image: ghcr.io/tucktuck101/battleships-rl-platform-training-ui:main
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

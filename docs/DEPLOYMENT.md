@@ -1,4 +1,12 @@
-# Deployment (Plan)
+# Deployment
+
+Doc status: Reviewed  
+Capability status: Partial  
+Last verified: 2026-04-25  
+Review trigger: compose, Dockerfile, k8s manifest, or model lifecycle behavior changes.
+
+## Current Truth
+Local Docker Compose packaging exists for the backend, gameplay UI, training UI, and trainer service. Runtime readiness depends on configured model artifact path/version/hash/device values. Kubernetes manifests are present as a platform target, but API-triggered Kubernetes job orchestration is placeholder-backed in current source.
 
 ## Local (MVP)
 - Backend: Python/FastAPI app; run locally with uvicorn; loads static RL model artifact from local path.
@@ -51,4 +59,22 @@
 
 ## Deterministic/Test Modes
 - `DETERMINISTIC_MODE=true` enables stubbed/deterministic agent and seeds; use only for tests/local debugging. Production should set false and rely on real model.
-- Ensure CI smoke tests run readiness after setting deterministic mode with stubbed artifact to keep pipelines fast.***
+- Ensure CI smoke tests run readiness after setting deterministic mode with stubbed artifact to keep pipelines fast.
+
+## Implemented
+- Separate backend, gameplay frontend, training frontend, and trainer Dockerfiles.
+- Docker Compose service wiring for backend, gameplay UI on 3000, training UI on 3001, and trainer.
+- Backend readiness healthcheck against `/health/ready`.
+- Environment-driven model artifact, CORS, observability, and deterministic-mode settings.
+
+## Planned
+- Validated Kubernetes deployment/job path with environment-specific command variants.
+- Real API-triggered Compose/Kubernetes trainer execution.
+- Formal promotion pipeline that updates runtime config only after artifact validation passes.
+
+## Roadmap
+- Keep compose defaults synchronized with `docker-compose.yml` and config requirements in `app/config.py`.
+- Treat k8s docs as deployment targets until command evidence proves them.
+
+## Verification
+Reconciled on 2026-04-25 against `docker-compose.yml`, `Dockerfile.backend`, `Dockerfile.frontend`, `Dockerfile.training-frontend`, `Dockerfile.trainer`, `app/config.py`, and `app/health.py`.

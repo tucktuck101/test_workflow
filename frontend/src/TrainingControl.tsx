@@ -462,9 +462,9 @@ export function TrainingControl({ onError }: Props) {
       <p style={{ marginBottom: 12, color: 'var(--muted)' }}>
         Configure and launch training runs here. The form builds the full YAML config for the
         trainer (data, DQN, self-play) without editing files by hand. To use it: (1) adjust any
-        fields you need, or click “Reset to defaults” to restore the bundled mini-run settings;
-        (2) optionally upload an existing YAML to prefill the form (the uploaded values apply only
-        to this session and do not overwrite files); (3) click “Start training” to launch a run with
+        fields you need, or click “Reset to defaults” to restore the bundled mini-run settings; (2)
+        optionally upload an existing YAML to prefill the form (the uploaded values apply only to
+        this session and do not overwrite files); (3) click “Start training” to launch a run with
         the current form values. Each run writes a timestamped model artifact and metrics to the
         configured output directory. You can also edit the curriculum YAML below to change phases
         and opponent mixes per run.
@@ -550,7 +550,14 @@ export function TrainingControl({ onError }: Props) {
                   }
                 />
               </label>
-              <div className="form-grid" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+              <div
+                className="form-grid"
+                style={{
+                  display: 'grid',
+                  gap: 8,
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                }}
+              >
                 {(['min_episodes', 'min_rounds', 'min_win_rate'] as const).map((field) => (
                   <label
                     key={field}
@@ -572,8 +579,8 @@ export function TrainingControl({ onError }: Props) {
                             e.target.value === ''
                               ? undefined
                               : field === 'min_win_rate'
-                              ? Number(e.target.value)
-                              : parseInt(e.target.value, 10);
+                                ? Number(e.target.value)
+                                : parseInt(e.target.value, 10);
                           next.phases[idx] = { ...next.phases[idx], gating };
                           return next;
                         })
@@ -695,7 +702,10 @@ export function TrainingControl({ onError }: Props) {
         <input type="file" accept=".yaml,.yml,text/yaml" onChange={handleUpload} />
         <span style={{ color: 'var(--muted)' }}>Upload YAML to preload config</span>
       </label>
-      <div className="form-grid" style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
+      <div
+        className="form-grid"
+        style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}
+      >
         <label className="label" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span>
             <code>epochs</code>
@@ -963,7 +973,10 @@ export function TrainingControl({ onError }: Props) {
       </div>
       <div className="card" style={{ marginTop: 12 }}>
         <strong>DQN settings</strong>
-        <div className="form-grid" style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
+        <div
+          className="form-grid"
+          style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}
+        >
           <label className="label" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span>
               <code>model</code>
@@ -1223,7 +1236,10 @@ export function TrainingControl({ onError }: Props) {
       </div>
       <div className="card" style={{ marginTop: 12 }}>
         <strong>Self-play settings</strong>
-        <div className="form-grid" style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
+        <div
+          className="form-grid"
+          style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}
+        >
           <label className="label" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span>
               <code>chunk_episodes</code>

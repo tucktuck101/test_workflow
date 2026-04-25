@@ -1,0 +1,56 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-battleships-rl-platform-backend:ci}
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      - MODEL_PATH=/app/models/model.bin
+      - MODEL_ROOT=/app/models
+      - MODEL_VERSION=${MODEL_VERSION:-stub-v1}
+      - MODEL_HASH=${MODEL_HASH:-9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e}
+      - MODEL_DEVICE=${MODEL_DEVICE:-cpu}
+      - LOG_LEVEL=debug
+      - OBSERVABILITY_ENABLED=true
+      - DETERMINISTIC_MODE=true
+      - FRONTEND_ORIGIN=http://localhost:3000
+      - TRAINING_FRONTEND_ORIGIN=http://localhost:3001
+    ports:
+      - '8000:8000'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health/ready']
+      interval: 10s
+      timeout: 2s
+      retries: 5
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-battleships-rl-platform-frontend:ci}
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - '3000:80'
+
+  training-ui:
+    image: ${TRAINING_UI_IMAGE:-battleships-rl-platform-training-ui:ci}
+    build:
+      context: .
+      dockerfile: Dockerfile.training-frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - '3001:80'
+
+  trainer:
+    image: ${TRAINER_IMAGE:-battleships-rl-platform-trainer:ci}
+    build:
+      context: .
+      dockerfile: Dockerfile.trainer
+    environment:
+      - TRAIN_OUTPUT=/app/artifacts
+      - TRAIN_ARTIFACT_NAME=model.bin
+      - TRAIN_EPOCHS=2
+      - TRAIN_SEED=123
+      - TRAIN_DEVICE=cpu

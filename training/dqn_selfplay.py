@@ -1522,7 +1522,10 @@ def run_dqn_selfplay(
             )
 
         snapshot = q_net.copy()
-        snap_path = cfg.output_dir / f"model_snapshot{round_idx}_{datetime.utcnow().strftime('%y-%m-%d-%H-%M')}.bin"
+        snap_path = (
+            cfg.output_dir
+            / f"model_snapshot{round_idx}_{datetime.utcnow().strftime('%y-%m-%d-%H-%M')}.bin"
+        )
         snap_path.parent.mkdir(parents=True, exist_ok=True)
         np.savez_compressed(snap_path, **snapshot.to_payload())
         eval_opponent = phase_opponent if phase_opponent else snapshot

@@ -1,5 +1,13 @@
 # Architecture
 
+Doc status: Reviewed  
+Capability status: Partial  
+Last verified: 2026-04-25  
+Review trigger: module boundary, runtime flow, deployment, or orchestration changes.
+
+## Current Truth
+The architecture is a local-first full-stack ML training and inference environment. Runtime gameplay and model readiness paths are active. Training APIs model run lifecycle state, but job execution is currently simulated/placeholder-backed.
+
 ## System Classification
 - Full-stack web app with RL agent-driven gameplay.
 - Components: frontend (React/TypeScript), backend API (Python/FastAPI), RL inference module (static model), separate training pipeline (PyTorch).
@@ -45,3 +53,23 @@
 - **12-Factor:** config via envs; explicit dependency management; backing services (model artifacts) bound via config; port binding; stateless processes aside from in-memory MVP state with planned externalization; logs as structured streams; disposability supported via readiness tied to model load.
 - **Determinism & Limits:** `DETERMINISTIC_MODE` gates stubbed agent for tests/debug; seeded boards for repeatability; `MAX_ACTIVE_GAMES` enforces memory cap; planned 429 for cap/rate exceedance.
 - **Failure Modes:** inference/model errors fail fast and mark sessions aborted; cleanup on quit/finish/error; readiness blocks traffic until model load verified.
+
+## Implemented
+- FastAPI runtime with gameplay, model, health, readiness, and training lifecycle routes.
+- React/Vite gameplay UI and separate React/Vite training UI.
+- Offline training modules, configs, artifact validation, smoke scripts, and container definitions.
+- In-memory gameplay sessions and in-memory simulated training run state.
+
+## Planned
+- Process-backed local trainer orchestration behind the API.
+- Compose and Kubernetes trainer adapters that launch real isolated jobs.
+- Production-grade telemetry pipeline, dashboard artifacts, and alert rules.
+- Future persistence for game history, accounts, or leaderboards.
+
+## Roadmap
+- Keep architecture claims tied to source modules and container configuration.
+- Replace text-only portfolio diagrams with maintained diagrams after module boundaries stabilize.
+- Move orchestration capability status only after `app/trainer_orchestrator.py` launches real jobs.
+
+## Verification
+Reconciled on 2026-04-25 against `CODE_MAP.md`, `app/routes.py`, `app/trainer_orchestrator.py`, frontend entrypoints, training directories, and Docker Compose.

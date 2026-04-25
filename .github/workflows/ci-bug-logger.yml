@@ -2,9 +2,14 @@ name: CI Bug Logger
 
 on:
   workflow_run:
-    workflows: ['CI']
+    workflows: ['PR CI']
     types:
       - completed
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
 
 jobs:
   log-bug:
@@ -43,7 +48,7 @@ jobs:
 
             const run = context.payload.workflow_run;
             const branch = run.head_branch;
-            if (cfg.branches && !cfg.branches.includes(branch)) {
+            if (Array.isArray(cfg.branches) && cfg.branches.length && !cfg.branches.includes(branch)) {
               core.info(`Branch ${branch} not in config scope; skipping.`);
               return;
             }
@@ -58,70 +63,82 @@ jobs:
               'GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs',
               { owner: context.repo.owner, repo: context.repo.repo, run_id: run.id }
             );
-            const failingJobs = jobs.filter(j => j.conclusion && j.conclusion !== 'success');
+            const failingJobs = jobs.filter(j => j.conclusion && !['success', 'skipped'].includes(j.conclusion));
             if (!failingJobs.length) {
               core.info('No failing jobs found.');
               return;
             }
 
-            const job = failingJobs[0];
-            const failureMessage = job?.steps?.find(s => s.conclusion === 'failure')?.name || job.name;
-            const signatureString = `${run.name}:${job.name}:${branch}:${failureMessage || job.conclusion}`;
-            const signatureHash = crypto.createHash('sha256').update(signatureString).digest('hex');
-
-            const jobCfg = (wfCfg.jobs || []).find(j => j.name === job.name) || {};
-            const parentFeature = jobCfg.parent_feature || wfCfg.default_parent_feature || null;
-            const category = jobCfg.category || wfCfg.default_category || 'unknown';
-
-            const triageLabel = parentFeature ? (cfg.triage_labels?.needed || 'triage: needed') : (cfg.triage_labels?.feature_needed || 'triage: feature-needed');
-            const labels = [
-              cfg.triage_labels?.type_bug || 'Bug',
-              cfg.triage_labels?.source_ci || 'source: ci',
-              triageLabel,
-            ];
-
-            const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} "${signatureHash}" is:issue is:open`;
-            const search = await github.rest.search.issuesAndPullRequests({ q: searchQuery });
             const runUrl = run.html_url;
-            const jobUrl = job.html_url;
-            const body = [
-              `Summary: CI failure in ${run.name} / ${job.name} on ${branch}`,
-              `Parent Feature: ${parentFeature || 'UNKNOWN (set and re-triage)'}`,
-              `Detected By: github-actions`,
-              `Status: new`,
-              `Failure Signature: ${failureMessage || job.conclusion}`,
-              `Signature Hash: ${signatureHash}`,
-              `Context: workflow_run ${run.id}, branch ${branch}, sha ${run.head_sha}, actor ${run.actor?.login || 'unknown'}, job ${job.id}`,
-              `Run URL: ${runUrl}`,
-              `Job URL: ${jobUrl}`,
-              `Environment: ${branch}`,
-              `Suspected Category: ${category}`,
-              `Error Details: see logs in job URL`,
-              `Linked Work Items: Parent Feature: ${parentFeature || 'UNKNOWN'}`,
-              `Fix Tasks:`,
-              `- [ ] TASK-___`,
-              `Root Cause Summary:`,
-              `Reproduction / Rerun Instructions: re-run failed job from Actions UI`,
-              `Acceptance Criteria:`,
-              `- All Fix Tasks done and failure signature no longer reproduces.`,
-            ].join('\n');
+            const throttleMinutes = Number(cfg.dedupe?.throttle_minutes || 0);
+            const now = Date.now();
 
-            if (search.data.total_count > 0) {
-              const issue = search.data.items[0];
-              core.info(`Found existing bug #${issue.number}; adding comment.`);
-              await github.rest.issues.createComment({
+            for (const job of failingJobs) {
+              const failureMessage = job?.steps?.find(s => s.conclusion === 'failure')?.name || job.name;
+              const signatureString = `${run.name}:${job.name}:${branch}:${failureMessage || job.conclusion}`;
+              const signatureHash = crypto.createHash('sha256').update(signatureString).digest('hex');
+              const jobCfg = (wfCfg.jobs || []).find(j => j.name === job.name) || {};
+              const parentFeature = jobCfg.parent_feature || wfCfg.default_parent_feature || null;
+              const category = jobCfg.category || wfCfg.default_category || 'unknown';
+              const component = jobCfg.component || 'ci-cd';
+              const triageLabel = parentFeature ? (cfg.triage_labels?.needed || 'triage: needed') : (cfg.triage_labels?.feature_needed || 'triage: feature-needed');
+              const labels = [
+                cfg.triage_labels?.type_bug || 'Bug',
+                cfg.triage_labels?.source_ci || 'source: ci',
+                triageLabel,
+                component,
+              ];
+              const ownerCfg = (cfg.ownership?.owners || []).find(o => o.feature === parentFeature);
+              const assignees = ownerCfg?.assignees || [];
+              const jobUrl = job.html_url;
+              const body = [
+                `Summary: CI failure in ${run.name} / ${job.name} on ${branch}`,
+                `Parent Feature: ${parentFeature || 'UNKNOWN (set and re-triage)'}`,
+                `Detected By: github-actions`,
+                `Status: new`,
+                `Failure Signature: ${failureMessage || job.conclusion}`,
+                `Signature Hash: ${signatureHash}`,
+                `Context: workflow_run ${run.id}, branch ${branch}, sha ${run.head_sha}, actor ${run.actor?.login || 'unknown'}, job ${job.id}`,
+                `Run URL: ${runUrl}`,
+                `Job URL: ${jobUrl}`,
+                `Environment: ci`,
+                `Component: ${component}`,
+                `Suspected Category: ${category}`,
+                `Error Details: see logs in job URL`,
+                `Linked Work Items: Parent Feature: ${parentFeature || 'UNKNOWN'}`,
+                `Fix Tasks:`,
+                `- [ ] TASK-___`,
+                `Root Cause Summary:`,
+                `Reproduction / Rerun Instructions: re-run failed job from Actions UI`,
+                `Acceptance Criteria:`,
+                `- All Fix Tasks done and failure signature no longer reproduces.`,
+              ].join('\n');
+
+              const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} "${signatureHash}" is:issue is:open`;
+              const search = await github.rest.search.issuesAndPullRequests({ q: searchQuery });
+              if (search.data.total_count > 0) {
+                const issue = search.data.items[0];
+                const updatedAt = new Date(issue.updated_at).getTime();
+                if (throttleMinutes && now - updatedAt < throttleMinutes * 60 * 1000) {
+                  core.info(`Found existing bug #${issue.number}; throttled duplicate comment.`);
+                  continue;
+                }
+                core.info(`Found existing bug #${issue.number}; adding occurrence comment.`);
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `New occurrence of signature ${signatureHash} in ${runUrl}\nJob: ${jobUrl}\nBranch: ${branch}`,
+                });
+                continue;
+              }
+
+              await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: issue.number,
-                body: `New occurrence of signature ${signatureHash} in ${runUrl}\nJob: ${jobUrl}\nBranch: ${branch}`,
+                title: `BUG: CI failure ${run.name} / ${job.name} (${branch})`,
+                body,
+                labels,
+                assignees,
               });
-              return;
             }
-
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `BUG: CI failure ${run.name} / ${job.name} (${branch})`,
-              body,
-              labels,
-            });

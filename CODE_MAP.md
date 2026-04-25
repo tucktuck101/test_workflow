@@ -1,70 +1,65 @@
-# CODE_MAP (to be updated as code is added)
+# Code Map
 
-## Repository Layout
-- `README.md`: project overview and workflow.
-- `CONTRIBUTING.md`: contribution and Quality Gate expectations.
-- `PROCESS_CHECKLIST.md`: governance workflow guide.
-- `PROJECT_POLICY.yaml`: profile/tier/repo strategy/security guardrails.
-- `docs/`: design and planning docs (VISION, REQUIREMENTS, USER_STORIES, ARCHITECTURE, DATA_MODEL, API_SPEC, TEST_STRATEGY, OBSERVABILITY_SPEC, SECURITY_NOTES, DEPLOYMENT, RUNBOOKS, BACKLOG, STAGE4_PLANNING, EPIC_LOG).
-- `adr/`: architecture decisions (0001 workflow/tier, 0002 tech stack/runtime, 0003 state/model handling).
-- `.github/`: Issue/PR templates, CI workflow.
-- `ci/`: quality gates script.
-- `.env.example`, `CONFIGURATION.md`: environment/config guidance.
-- `models/stub_model.bin`: lightweight stub artifact for dev/CI (hash `9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e`, version `stub-v1`).
-- `init_codex_project.sh`, `reset_codex_init.sh`: bootstrap helpers.
-- `.editorconfig`, `.prettierrc.json`, `.pre-commit-config.yaml`, `pyproject.toml`: formatting/linting config for Python/JS and pre-commit.
+This is a compact source-oriented map for navigation. It is not a backlog and should not be used as proof that a feature is complete. Verify behavior against source and tests.
 
-## Current Code Structure
-- `app/`: FastAPI scaffold and configuration.
-  - `config.py`: environment/config parsing and validation (paths, devices, limits).
-  - `main.py`: FastAPI app factory and uvicorn runner.
-  - `engine.py`: game session model, ship placement (deterministic-capable), move adjudication, in-memory session store.
-  - `agent.py`: deterministic-capable agent stub.
-  - `errors.py`: structured error helpers.
-  - `health.py`: readiness hash/path checks.
-  - `rate_limit.py`: simple token bucket guard.
-  - `routes.py`: gameplay routes and health endpoints; readiness/rate limiting.
-  - `model_loader.py`: model hash/path readiness validation.
-  - `obs.py`: observability scaffold (spans/metrics placeholders).
-- `tests/`: Python tests.
-  - `test_config.py`: settings/env validation and app smoke test.
-  - `test_engine.py`: game engine/session tests (determinism, validation, outcomes).
-  - `test_health.py`: health/readiness tests.
-  - `test_rate_limit.py`: rate-limit guard tests.
-  - `test_agent.py`: deterministic agent tests.
-  - `test_routes.py`: gameplay API happy/error/capacity/idempotent and inference-failure cases.
-  - `test_session_store.py`: session store TTL/end behavior.
-  - `test_main.py`: CORS middleware behavior and preflight checks.
-- `requirements.txt`: Python dependencies (fastapi, uvicorn, pytest, mypy, otel).
-- `Makefile`: common tasks (backend coverage/typecheck, frontend tests, load test stub).
-- `frontend/`: React/Vite SPA for gameplay loop.
-  - `src/App.tsx`: UI for start/move/quit, boards, readiness badge, error/backoff messaging.
-  - `src/api.ts`: client wrapper, error mapping, config handling for `VITE_API_BASE_URL`.
-  - `src/styles.css`: design tokens/layout.
-  - `src/types.ts`: shared frontend types.
-  - `src/App.test.tsx`, `src/api.test.ts`: RTL/vitest coverage for flows and error mapping.
-  - `vite.config.ts`, `vitest.config.ts`, `tsconfig.json`, `package.json`, `package-lock.json`.
-- `docker-compose.yml`: local backend/frontend composition; healthcheck wiring.
-- `Dockerfile.backend`: backend container (FastAPI).
-- `Dockerfile.frontend`: builds Vite frontend into nginx.
-- `load_tests/k6_load.js`: k6 load test stub for start/move endpoints.
-- `load_tests/README.md`: how/when to run k6 load stub and target baselines.
-- `pytest.ini`: test warning filters.
-- `.devcontainer/`: VS Code devcontainer for Python 3.11 + Node 20 setup.
-- `training/`: stub training pipeline.
-  - `config.py`: training config/env parsing.
-  - `env.py`: Battleship training environment with rewards/actions.
-  - `policy.py`: simple Q-learning policy.
-  - `trainer.py`: trains policy and emits artifact + manifest (hash/version/device/episodes/hparams).
-  - `eval.py`: evaluate trained policy.
-  - `tests/test_training.py`: verifies deterministic artifact/manifest, validator, env rewards, and eval.
-  - `tools/validate_artifact.py`: CLI to validate artifact vs manifest/hash/root/device for promotion checks.
-- `.github/workflows/artifact-validate.yml`: manual workflow to run artifact validation CLI for promotions.
-- `app/rate_limit.py`: token bucket limiter with RateLimitExceeded.
-- `tests/test_rate_limit.py`: ensures 429 with Retry-After and non-limited path.
+## First Reads
+- `AGENTS.md`: Codex operating guide and source-of-truth rules.
+- `docs/CURRENT_STATE.md`: current implementation snapshot.
+- `README.md`: human-facing overview and common commands.
+- `PROJECT_POLICY.yaml`: project constraints such as local-only cost guardrails and allowed stack.
+- `docs/portfolio/CASE_STUDY.md`: portfolio framing for the ML training and SRE/platform story.
+- `docs/DEMO_PATH.md`: intended fresh-checkout demo path and caveats.
 
-## Planned Additions
-- Frontend: React/Vite app, components, API client, tests.
-- Training: RL training pipeline scripts and artifacts.
+## Backend
+- `app/main.py`: FastAPI app factory and runtime wiring.
+- `app/routes.py`: gameplay, model, training, and health route registration.
+- `app/schemas.py`: API request/response models.
+- `app/engine.py`: Battleship rules, sessions, ship placement, moves, and in-memory session store.
+- `app/agent.py`: deterministic, policy, and `.npz` agent move adapter paths.
+- `app/model_loader.py` and `app/health.py`: model readiness and health payload support.
+- `app/rate_limit.py`: simple rate limiting.
+- `app/trainer_orchestrator.py`: training run lifecycle abstraction; verify implementation before assuming real job orchestration.
 
-Update this map when scaffolding code and new modules are added.***
+## Frontend
+- `frontend/src/App.tsx`: gameplay UI.
+- `frontend/src/TrainingControl.tsx`: training control UI.
+- `frontend/src/api.ts`: browser API client and error mapping.
+- `frontend/src/types.ts`: frontend API and UI types.
+- `frontend/src/styles.css`: shared styling.
+- `frontend/src/main.tsx` and `frontend/src/training.tsx`: Vite entrypoints.
+- `frontend/vite.config.ts` and `frontend/vite.training.config.ts`: gameplay and training UI builds.
+
+## Training And Bots
+- `training/`: training configs, envs, policies, state encoding, vectorized envs, DQN/self-play, curriculum, trainer, and eval code.
+- `configs/`: YAML configs and schemas for DQN training and curriculum.
+- `bots/scripted_opponents.py`: scripted opponents used by gameplay/training paths.
+- `tools/validate_artifact.py`: artifact validation CLI.
+- `scripts/train_smoke.sh`: small training validation flow.
+- `scripts/verify_local.sh`: local dev/test parity check before PR handoff.
+- `scripts/smoke_local.sh`: CI-safe Compose smoke path.
+- `scripts/plot_dqn_metrics.py`: metrics plotting helper.
+
+## Containers And Deployment
+- `docker-compose.yml`: local backend, gameplay frontend, training UI, and trainer services.
+- `docker-compose.ci.yml`: CI-safe runtime smoke stack with baked model defaults.
+- `Dockerfile.backend`: backend image.
+- `Dockerfile.frontend`: gameplay frontend image.
+- `Dockerfile.training-frontend`: training UI image.
+- `Dockerfile.trainer`: trainer image.
+- `k8s/base/` and `k8s/overlays/k3s/`: runtime deployment/service manifests.
+- `k8s/trainer-job.yaml` and `k8s/trainer-cronjob.yaml`: trainer workload manifests.
+
+## Tests
+- `tests/`: backend, game engine, route, training, session, config, health, and bot tests.
+- `frontend/src/*.test.tsx` and `frontend/src/*.test.ts`: Vitest/RTL frontend tests.
+- `frontend/e2e/`: Playwright e2e tests.
+- `load_tests/`: k6 load-test stub and notes.
+
+## Portfolio And Operations Docs
+- `docs/portfolio/`: case study, architecture overview, ML pipeline story, and SRE/platform story.
+- `docs/operations/`: SLO, alerting, dashboard, incident response, and RCA stubs.
+- `docs/ml/`: model lifecycle, artifact promotion, training orchestration, and evaluation strategy.
+- `docs/history/`: historical planning and governance docs preserved for context.
+
+## Generated Or Local-Only
+Normally ignore `artifacts/`, `frontend/dist/`, `frontend/dist-training/`, `frontend/coverage/`, `.coverage`, caches, `.venv/`, `frontend/node_modules/`, `git_diag_*`, and `screencaps/`.

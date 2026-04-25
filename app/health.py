@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Dict
 
 from .config import Settings
-from .model_loader import ModelLoader
 from .errors import raise_http
+from .model_loader import ModelLoader
 
 
 def _sha256_file(path: Path) -> str:

@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+.pytest_cache
+.ruff_cache
+.mypy_cache
+__pycache__
+*.py[cod]
+.coverage
+frontend/node_modules
+frontend/dist
+frontend/dist-training
+frontend/coverage
+node_modules
+artifacts
+git_diag_*
+screencaps

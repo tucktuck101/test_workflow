@@ -8,7 +8,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: trainer
-          image: battleship-trainer:latest
+          image: ghcr.io/tucktuck101/battleships-rl-platform-trainer:main
           imagePullPolicy: IfNotPresent
           env:
             - name: TRAIN_OUTPUT

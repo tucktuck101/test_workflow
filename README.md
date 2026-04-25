@@ -1,58 +1,81 @@
-# Coding Agent Workflow — Battleship RL MVP
+# Battleships RL Platform
 
-## Overview
-Production-ready Battleship web app where users anonymously play against a pre-trained RL agent. Local-first, Kubernetes-ready, open-source stack (React/TypeScript frontend, FastAPI/Python backend, PyTorch RL).
+This repository uses Battleships as a controlled RL/AI training platform. The portfolio focus is training agents, validating and promoting model artifacts, serving inference, and applying SRE/Platform Engineering practices around the training and runtime delivery system.
 
-## Current Status
-- Stage: 4 (Planning). Design/architecture, requirements, and ADRs 0001–0003 are complete. Implementation has not started.
-- Profiles: workflow_profile standard, tier standard (ADR-0001). Repo strategy monorepo. Risk level medium.
-- Scope priorities: MVP gameplay API + frontend loop → observability/tests → training pipeline bootstrap.
+The implementation is active: FastAPI backend, React/Vite gameplay UI, React/Vite training UI, training modules, containers, smoke paths, and tests are present. Some older planning and governance docs remain useful as history, but they may be stale. For Codex/project navigation, start with `AGENTS.md` and `docs/CURRENT_STATE.md`.
 
-## Key Docs
-- Vision/Requirements/User Stories: `docs/VISION.md`, `docs/REQUIREMENTS.md`, `docs/USER_STORIES.md`
-- Architecture/Data/API/Test/Obs/Security/Deployment: under `docs/` (see also `docs/BACKLOG.md` for planned work)
-- ADRs: `adr/ADR-0001-workflow-profile-and-tier.md`, `adr/ADR-0002-tech-stack-and-runtime-architecture.md`, `adr/ADR-0003-state-and-model-handling.md`
-- Planning: `docs/STAGE4_PLANNING.md`, `docs/BACKLOG.md`, `docs/EPIC_LOG.md`
-- Configuration/env: `CONFIGURATION.md`, `.env.example`
+## What Is Here
+- Backend API in `app/`: gameplay routes, model routes, health/readiness, session state, rate limiting, and training run endpoints.
+- Gameplay frontend in `frontend/src/App.tsx`: board UI, readiness/model metadata, ship placement, human play, bot types, and auto-play wiring.
+- Training UI in `frontend/src/TrainingControl.tsx`: training config form, curriculum editing, run lifecycle actions, and metrics polling.
+- Training pipeline in `training/`: environment, policies, DQN/self-play, curriculum, evaluation, artifact generation, and validation support.
+- Runtime packaging in `docker-compose.yml`, `Dockerfile.*`, and `k8s/`.
+- Tests in `tests/`, `frontend/src/*.test.*`, and `frontend/e2e/`.
 
-## Workflow & Quality Gates
-- Issues/PRs required; use templates in `.github/`.
-- Classify risk_level/tier (default medium/standard) and apply Quality Gates (tests, coverage, security, observability). No coverage drops >2pp on touched components without justification.
-- ADRs for material decisions (stack, persistence, infra, cost/guardrails, state model).
-- Branch naming: `feature/<desc>`, `fix/<desc>`, `epic/<id>-<desc>`, `proposal/<decision-id>-<desc>` when needed.
-- Tags per PROCESS_CHECKLIST: `epic-<id>-start`, `epic-<id>-feature-<name>-done`, `epic-<id>-complete`.
-- Critic Pass before merge; red-flag human review for auth/data schema/public API/security-sensitive paths.
+## Portfolio Story
+- `docs/portfolio/CASE_STUDY.md`: portfolio framing and current evidence.
+- `docs/portfolio/ML_PIPELINE_STORY.md`: training, artifact, validation, promotion, and serving narrative.
+- `docs/portfolio/SRE_PLATFORM_STORY.md`: SRE/Platform practices around inference and training operations.
+- `docs/DEMO_PATH.md`: intended fresh-checkout demo flow and current caveats.
 
-## Getting Started (pre-implementation)
-1) Install pre-commit: `pip install pre-commit` and run `pre-commit install`. Hooks cover trailing whitespace, EOF, YAML/JSON, secrets, codespell, black, ruff, and prettier.
-2) Review env defaults in `.env.example` and CONFIGURATION; adjust when backend exists. A stub artifact is provided at `models/stub_model.bin` with hash `9d282bb3026000b1535a0129145ad46fba61fab5799be1a65928797e61d3006e` and version `stub-v1` for dev/CI readiness.
-3) CI: `.github/workflows/ci.yml` runs pre-commit, quality gates via `ci/run_quality_gates.sh` (auto-detects Node/Python projects). Update scripts/tests as code lands. Coverage uses pytest-cov; mypy configured; load test stub in `load_tests/k6_load.js` (manual/nightly).
-4) Backend formatting/linting: see `.editorconfig`, `.prettierrc.json`, and `pyproject.toml` for formatter/linter settings (black/ruff/prettier).
-5) Frontend: `cd frontend && npm install && npm run dev` (or `npm test` for vitest/RTL). Configure `VITE_API_BASE_URL` in `.env` if hitting a non-default backend.
-6) Makefile helpers: `make backend-coverage` (pytest with 90% gate), `make frontend-test` (vitest with thresholds), `make load-test` (k6 stub), `make setup` to bootstrap venv + npm deps. Devcontainer available in `.devcontainer/`.
-7) Containers: `make run` (or `docker compose up --build`) builds backend/frontend with the trained model mounted from `./artifacts` (see MODEL_* envs in docker-compose). Frontend served on :3000 pointing to backend service. Ensure `artifacts/model.bin` exists (run `make train` if not).
-8) Training stub: `python -m training.trainer` (config via TRAIN_* envs) writes artifact + manifest to `./artifacts` by default; logs progress every `TRAIN_LOG_INTERVAL` episodes (default 10). Defaults now mirror real rules: 10×10 board, full fleet (5/4/3/3/2), adjacency allowed by default (`TRAIN_ALLOW_ADJACENT=true`). If you shrink the board via `TRAIN_BOARD_SIZE`, supply a smaller fleet (via `TrainConfig` in code) or it will error when ships don't fit. See tests/test_training.py for deterministic expectations.
-9) Artifact validation: `python -m tools.validate_artifact --artifact <file> --manifest <manifest.json> --root <MODEL_ROOT> --device <cpu|cuda>` for promotion checks. Promotion/rollback steps in `docs/RUNBOOKS.md`.
-10) CI helper: manual workflow `.github/workflows/artifact-validate.yml` runs the validation CLI; trigger via Actions → Artifact Validate with artifact/manifest/root/device inputs.
-11) Training smoke: `make train-smoke` runs mini-train + validator + eval; CI job `training-smoke` runs the same.
-12) Full training via Makefile:
-   - `make train` runs DQN self-play using the YAML config at `CONFIG` (default `configs/dqn_train.yaml`), then calls the metrics plotter. Override config path with `CONFIG=<path>`. Env vars can still override YAML values.
+## Start Here
+For future Codex work:
 
-### Gameplay loop (frontend)
-- Click **Start Game** to enter placement mode, then place your fleet by selecting 17 tiles (5+4+3+3+2). Only your ships are shown.
-- Hit **Confirm placements** to start; the agent auto-places its ships and your grid keeps ships visible (`⬢` for unhit).
-- Fire by clicking the Agent Board. The game ends when one fleet is sunk; restart repeats the placement flow.
-- Ships must follow Battleship rules: each ship is a straight, contiguous line (horizontal or vertical) and ships cannot overlap; use the orientation toggle while placing.
+1. Read `AGENTS.md`.
+2. Run `git status --short --branch`.
+3. Inspect changed files before editing.
+4. Use `rg --files` and targeted `rg` searches to find current source truth.
+5. Treat older docs as historical until verified against code/tests/config.
 
-## Structure (see `CODE_MAP.md` for more)
-- `docs/`: Design/requirements/test/obs/security/deployment/planning/backlog
-- `adr/`: Architecture decisions
-- `ci/`: CI helper scripts
-- `.github/`: Issue/PR templates and workflows
-- `init_codex_project.sh`, `reset_codex_init.sh`: bootstrap helpers
+For humans, `docs/CURRENT_STATE.md` gives a compact snapshot of the current implementation.
 
-## Next Steps (Stage 4/6)
-- Populate Issues/board with Epics/Features/Tasks from `docs/BACKLOG.md` (in progress). Use board columns Backlog → Ready → In Progress → In Review → Ready for Human Review → Done.
-- Update CODE_MAP entries as code is scaffolded; update EPIC_LOG per epic milestones.
-- Implementation path: backend gameplay API (F1/T1–T4), rate-limit guard, inference adapter (F2/T5–T6), frontend loop (F3), observability/CI/devcontainer (F4/T16+), training pipeline (F5/F6).
-- Load testing: see `load_tests/k6_load.js` (manual/nightly; configure BASE_URL).
+## Common Commands
+- `make setup`: create a Python venv, install Python requirements, and install frontend dependencies.
+- `make verify-local`: run the local dev/test parity checks used before opening a PR.
+- `make backend-test`: run Python tests.
+- `make backend-coverage`: run backend coverage checks.
+- `make frontend-test`: run Vitest with coverage.
+- `make train-smoke`: run mini training, validation, and evaluation smoke.
+- `make smoke`: run the local smoke script.
+- `make smoke-local`: run the CI-safe Docker Compose smoke path with baked stub model config.
+- `make run`: build and run the Docker Compose stack.
+- `make train`: run DQN self-play using `CONFIG`, defaulting to `configs/dqn_train.yaml`.
+
+Frontend-only commands:
+
+- `cd frontend && npm run dev`
+- `cd frontend && npm run build`
+- `cd frontend && npm run build:training`
+- `cd frontend && npm run typecheck`
+- `cd frontend && npm run test:e2e`
+
+## Configuration
+Runtime configuration is environment-driven. Start with `.env.example` and `CONFIGURATION.md`, then verify current behavior in `app/config.py`, `docker-compose.yml`, and the relevant Dockerfile.
+
+Backend model readiness depends on the configured model path, version, hash, and device. Generated training artifacts should live under `artifacts/` locally and should not be treated as source.
+
+## Documentation Notes
+- `docs/README.md`: canonical docs entrypoint and trust/precedence rules.
+- `AGENTS.md`: canonical Codex operating guide.
+- `docs/CURRENT_STATE.md`: source-verified implementation snapshot.
+- `docs/REPOSITORY_BOOTSTRAP.md`: clean GitHub presentation repo and Project setup guide.
+- `CODE_MAP.md`: compact subsystem map.
+- `docs/portfolio/`, `docs/operations/`, and `docs/ml/`: portfolio-oriented SRE, platform, and ML lifecycle stubs.
+- `docs/history/`, `docs/history/governance/`, and `adr/`: governance, design history, and planning context. Verify before relying on them.
+
+## Gameplay Loop
+- Start a game from the frontend.
+- For human play, place the full fleet and confirm placements.
+- Fire on the agent board until one fleet is sunk.
+- Bot player types and auto-play are available through the UI/API configuration.
+
+## Artifact Hygiene
+Generated outputs are intentionally ignored:
+
+- `artifacts/`
+- `frontend/dist/`
+- `frontend/dist-training/`
+- `frontend/coverage/`
+- local caches such as `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `.venv/`, and `frontend/node_modules/`
+
+Keep `artifacts/.gitkeep` so the local artifact directory exists in fresh checkouts.

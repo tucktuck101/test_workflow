@@ -12,3 +12,8 @@ frontend/dist/
 frontend/coverage/
 .coverage
 scratchpad
+artifacts/*
+!artifacts/.gitkeep
+frontend/dist-training/
+git_diag_*/
+screencaps/

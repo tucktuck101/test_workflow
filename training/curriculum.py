@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -300,4 +301,4 @@ class CurriculumState:
             "completed": self.completed,
         }
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        self.state_path.write_text(yaml.safe_dump(payload))
+        self.state_path.write_text(json.dumps(payload, indent=2))

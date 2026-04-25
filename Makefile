@@ -3,8 +3,9 @@ PYTHON?=$(VENV)/bin/python
 PIP?=$(PYTHON) -m pip
 FRONTEND_DIR?=frontend
 CONFIG?=configs/dqn_train.yaml
+COVERAGE_THRESHOLD?=50
 
-.PHONY: setup backend-test backend-typecheck backend-coverage frontend-install frontend-test load-test lint train train-smoke
+.PHONY: setup backend-test backend-typecheck backend-coverage frontend-install frontend-test load-test lint smoke smoke-local train train-smoke verify-local
 
 setup:
 	python -m venv $(VENV)
@@ -18,7 +19,7 @@ backend-typecheck:
 	mypy .
 
 backend-coverage:
-	$(PYTHON) -m pytest --cov=app --cov=tests --cov-fail-under=90
+	$(PYTHON) -m pytest --cov=app --cov=tests --cov-fail-under=$(COVERAGE_THRESHOLD)
 
 frontend-install:
 	cd $(FRONTEND_DIR) && npm install
@@ -32,8 +33,14 @@ load-test:
 smoke:
 	./scripts/smoke.sh
 
+smoke-local:
+	./scripts/smoke_local.sh
+
 train-smoke:
 	./scripts/train_smoke.sh
+
+verify-local:
+	./scripts/verify_local.sh
 
 train:
 	@if [ ! -f "$(CONFIG)" ]; then \

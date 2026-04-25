@@ -4,8 +4,8 @@ phases:
     name: Boot Camp
     description: Small board warm-up against simple opponents.
     gating:
-      min_episodes: 0
-      min_win_rate: 0.0
+      min_episodes: 5000
+      min_win_rate: 0.8
     opponents:
       - opponent: random
         weight: 0.7
@@ -17,8 +17,8 @@ phases:
         epsilon_end: 0.1
         epsilon_decay: 4000
       selfplay:
-        eval_games: 50
-        eval_threshold: 0.4
+        eval_games: 5000
+        eval_threshold: 0.7
 
   - id: skirmish
     name: Skirmish Control
@@ -26,7 +26,7 @@ phases:
     gating:
       min_episodes: 2000
       min_rounds: 1
-      min_win_rate: 0.55
+      min_win_rate: 0.8
     opponents:
       - opponent: hunt_target
         weight: 0.5
@@ -38,5 +38,5 @@ phases:
         epsilon_end: 0.05
         epsilon_decay: 6000
       selfplay:
-        eval_games: 75
-        eval_threshold: 0.65
+        eval_games: 5000
+        eval_threshold: 0.8

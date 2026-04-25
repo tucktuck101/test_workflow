@@ -1,3 +1,0 @@
-## Test: ls-remote against public repo 'git/git' over HTTPS
-f0ef5b6d9bcc258e4cbef93839d1b7465d5212b9	HEAD
-exit_code=0

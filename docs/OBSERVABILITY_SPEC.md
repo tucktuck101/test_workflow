@@ -1,5 +1,13 @@
 # Observability Spec
 
+Doc status: Reviewed  
+Capability status: Partial  
+Last verified: 2026-04-25  
+Review trigger: metrics naming, exporter changes, tracing changes, alert policy changes.
+
+## Current Truth
+The backend has observability scaffolding and documented metric/log/trace intent. Dashboard and alert definitions are still documentation-level stubs until concrete exporter/rule/dashboard artifacts are added.
+
 ## Metrics
 - Request latency and counts for start/move/quit endpoints (by status/outcome).
 - RL inference latency and error counts.
@@ -18,13 +26,13 @@
 ## Health/Readiness
 - `/health/live` (process up) and `/health/ready` reflecting model load status and critical dependencies; readiness returns version/hash on success.
 
-## SLOs / SLIs (initial)
+## SLOs / SLIs (partial, baseline-first)
 - **SLI:** Turn handling success rate (2xx) and p95 latency for `/api/games/{id}/moves` (player move + agent response).
-- **SLO (draft):** p95 latency target ≤ 500ms in dev; tighten after load testing. Success rate ≥ 99% excluding client errors.
+- **SLO (partial):** p95 latency target ≤ 500ms in dev; tighten after load testing. Success rate ≥ 99% excluding client errors.
 - **SLI:** RL inference p95 latency and error rate.
-- **SLO (draft):** p95 inference latency ≤ 200ms; revisit after baseline.
+- **SLO (partial):** p95 inference latency ≤ 200ms; revisit after baseline.
 - **SLI:** Readiness success rate (model load) over 5-minute windows.
-- **SLO (draft):** Readiness success ≥ 99.9% during normal operation.
+- **SLO (partial):** Readiness success ≥ 99.9% during normal operation.
 
 ## Operational Notes
 - Primary impacted operations: start game, player move (includes inference), quit game. Each MUST have at least one metric, structured log, and trace span covering the operation.
@@ -41,7 +49,7 @@
 - Cardinality: allow `game_id` tag in logs and traces; avoid high-cardinality fields (no coordinates, payloads). Limit status/outcome labels to small enums.
 - Sampling: keep tracing sampling low but deterministic in tests; configurable sampling rate via env for prod-like runs.
 
-## Alerts (draft)
+## Alerts (partial)
 - Alert if move p95 latency > 500ms for 5 minutes (dev baseline), inference error rate > 1%, or readiness fails for >2 minutes.
 - Page/block PR if `model_ready` = 0 on startup; surface in CI smoke tests.
 
@@ -58,3 +66,21 @@
   - Readiness failing > 2m (model_ready = 0).
   - Capacity nearing cap: active_games > 90% of `MAX_ACTIVE_GAMES`.
 - Ownership: Backend/infra team; page operator; warn-only for capacity/readiness in dev. Tune thresholds after baseline load test.
+
+## Implemented
+- Health/readiness endpoint behavior and readiness model metadata.
+- Observability-oriented route spans and metric recording points in backend source.
+- Documentation for runtime and ML lifecycle metrics, logs, traces, alerts, and dashboard panels.
+
+## Planned
+- Stable exporter configuration and metric naming contract.
+- Stored dashboard definitions or screenshots.
+- Concrete alert rule files with owners and IDs.
+- Baseline load-test data to replace draft SLO thresholds.
+
+## Roadmap
+- Keep this spec aligned with `docs/operations/SLOS.md`, `docs/operations/ALERTING.md`, and `docs/operations/DASHBOARDS.md`.
+- Treat all thresholds as draft until measured baselines are recorded in `docs/VERIFICATION.md` or a linked evidence note.
+
+## Verification
+Reconciled on 2026-04-25 against backend route behavior, health/readiness source, current operations docs, and `docs/VERIFICATION.md`.

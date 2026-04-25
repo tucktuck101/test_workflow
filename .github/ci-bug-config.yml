@@ -1,22 +1,47 @@
 enabled: true
-branches:
-  - main
-  - stage-6-implementation
+branches: []
 
 workflows:
-  - name: CI
+  - name: PR CI
     default_parent_feature: FEAT-CI-GENERAL
     default_category: test-failure
     jobs:
-      - name: pre-commit
+      - name: backend
         parent_feature: FEAT-CI-QUALITY
         category: test-failure
+        component: backend
       - name: quality-gates
         parent_feature: FEAT-CI-QUALITY
         category: test-failure
+        component: ci-cd
+      - name: frontend
+        parent_feature: FEAT-CI-QUALITY
+        category: test-failure
+        component: frontend
+      - name: training-smoke
+        parent_feature: FEAT-CI-TRAINING
+        category: test-failure
+        component: training
+      - name: docker-build
+        parent_feature: FEAT-CI-CD
+        category: build
+        component: ci-cd
+      - name: compose-smoke
+        parent_feature: FEAT-CI-CD
+        category: infra
+        component: ci-cd
+      - name: e2e
+        parent_feature: FEAT-CI-QUALITY
+        category: test-failure
+        component: frontend
       - name: security
         parent_feature: FEAT-CI-SECURITY
         category: dependency
+        component: ci-cd
+      - name: workflow-lint
+        parent_feature: FEAT-CI-CD
+        category: config
+        component: ci-cd
 
 triage_labels:
   needed: 'triage: needed'
