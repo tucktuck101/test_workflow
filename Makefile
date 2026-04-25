@@ -8,7 +8,7 @@ COVERAGE_THRESHOLD?=50
 .PHONY: setup backend-test backend-typecheck backend-coverage frontend-install frontend-test load-test lint smoke smoke-local train train-smoke verify-local
 
 setup:
-	python -m venv $(VENV)
+	python -m venv --clear $(VENV)
 	$(PIP) install -r requirements.txt
 	cd $(FRONTEND_DIR) && npm install
 

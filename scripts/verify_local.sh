@@ -10,7 +10,9 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
 fi
 
 echo "[verify-local] Backend tests with coverage"
-COVERAGE_THRESHOLD="${COVERAGE_THRESHOLD:-50}" "$PYTHON_BIN" -m pytest \
+COVERAGE_THRESHOLD="${COVERAGE_THRESHOLD:-50}"
+
+"$PYTHON_BIN" -m pytest \
   --maxfail=1 \
   --disable-warnings \
   --cov=app \
